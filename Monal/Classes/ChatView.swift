@@ -125,6 +125,7 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var isTyping = false
     @State private var typingTimer: Timer?
+    @State private var scrollToMessage: ScrollToParams?
 
     init(contact: ObservableKVOWrapper<MLContact>) {
         _contact = StateObject(wrappedValue:contact)
@@ -425,6 +426,27 @@ struct ChatView: View {
         }
     }
 
+    private func insertQueuedMessages() {
+        messageInsertionTimer?.invalidate()
+        messageInsertionTimer = nil
+        guard !queuedNewMessages.isEmpty else {
+            return
+        }
+        messages.append(contentsOf: queuedNewMessages)
+        queuedNewMessages.removeAll(keepingCapacity: true)
+    }
+
+    private func appendOutgoingMessage(_ message: MLMessage) {
+        // A received message may still be waiting for the batching timer. Insert it first
+        // so sending locally cannot move it after our reply in the conversation.
+        insertQueuedMessages()
+        let chatMessage = ChatViewMessage(message)
+        messages.append(chatMessage)
+        // Let ExyteChat's update queue apply the insertion before scrolling to this ID.
+        // In particular, an upload can finish long after its composer send callback.
+        scrollToMessage = ScrollToParams(messageID: chatMessage.id, position: .bottom)
+    }
+
     private func uploadAndSendFile(_ localFileURL: URL?, useMediaCompression: Bool = false) async {
         guard let localFileURL = localFileURL else {
             DDLogError("Couldn't get file location in order to upload it!")
@@ -448,7 +470,7 @@ struct ChatView: View {
                     self.isUploadingFile = false
                     return
                 }
-                messages.append(ChatViewMessage(newMLMessage))
+                appendOutgoingMessage(newMLMessage)
             }
         } catch {
             localFileURL.stopAccessingSecurityScopedResource()
@@ -483,7 +505,7 @@ struct ChatView: View {
                 guard let newMLMessage = MLXMPPManager.sharedInstance().sendMessageAndAddToHistory(message: draft.text, havingType: kMessageTypeText, toContact: self.contact.obj, isEncrypted: self.contact.isEncrypted, uploadInfo: nil) else {
                     return
                 }
-                messages.append(ChatViewMessage(newMLMessage))
+                appendOutgoingMessage(newMLMessage)
                 sendChatState(isTyping: false)
                 // Clear the draft to show the newly sent message in active chats
                 DispatchQueue.global(qos: .userInitiated).async {
@@ -495,7 +517,7 @@ struct ChatView: View {
                 guard let newMLMessage = MLXMPPManager.sharedInstance().sendMessageAndAddToHistory(message: messageText, havingType: kMessageTypeGeo, toContact: self.contact.obj, isEncrypted: self.contact.isEncrypted, uploadInfo: nil) else {
                     return
                 }
-                messages.append(ChatViewMessage(newMLMessage))
+                appendOutgoingMessage(newMLMessage)
             }
         } messageMenuAction: { (action: MessageAction, defaultActionClosure, message) in
             let mlMessage = (message as! ChatViewMessage).innerMessage.obj
@@ -642,6 +664,7 @@ struct ChatView: View {
         }
         .linkPreviewsEnabled(chatViewDefaultsDB.showURLPreview)
         .inputViewText($inputText)
+        .scrollTo(scrollToMessage)
         .checkFileSizeClosure { file in
             MLFiletransfer.checkMimeTypeAndSize(forHistoryID: Int(file.id)! as NSNumber)
         }
@@ -897,7 +920,8 @@ struct ChatView: View {
             if MLNotificationManager.sharedInstance().currentContact == self.contact.obj {
                 MLNotificationManager.sharedInstance().currentContact = nil
             }
-            messageInsertionTimer?.invalidate()
+            // Keep both the queue and timer consistent if this view appears again.
+            insertQueuedMessages()
             sendChatState(isTyping: false)
             DispatchQueue.global(qos: .userInitiated).async {
                 DataLayer.sharedInstance().saveMessageDraft(self.contact.contactJid, forAccount:self.account.accountID, withComment:self.inputText)
@@ -948,9 +972,7 @@ struct ChatView: View {
                 queuedNewMessages.append(ChatViewMessage(message))
                 if messageInsertionTimer == nil {
                     messageInsertionTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { _ in
-                        messages.append(contentsOf: queuedNewMessages)
-                        queuedNewMessages.removeAll(keepingCapacity: true)
-                        messageInsertionTimer = nil
+                        insertQueuedMessages()
                     }
                     messageInsertionTimer?.tolerance = 0.04
                 }
