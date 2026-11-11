@@ -1,0 +1,67 @@
+# Local testing workflow for this fork; keep it out of upstream feature PRs.
+# Produces an UNSIGNED IPA that must be signed before installation on an iPhone.
+workflows:
+  monal-ios-unsigned:
+    name: Monal Alpha - unsigned iPhone IPA
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    environment:
+      # Match the Xcode version used by Monal's GitHub Actions test build.
+      xcode: 26.2
+      cocoapods: default
+    scripts:
+      - name: Fetch Monal submodules and LFS assets
+        script: |
+          set -eu
+          git submodule update --init --recursive
+          if command -v git-lfs >/dev/null 2>&1; then
+            git lfs pull
+          fi
+
+      - name: Build Monal's Rust-Swift bridge
+        script: |
+          set -eu
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
+          bash rust/build-rust.sh
+
+      - name: Install CocoaPods dependencies
+        script: |
+          set -eu
+          cd Monal
+          pod install --repo-update
+
+      - name: Build Monal Alpha for iPhone without signing
+        script: |
+          set -eu
+          xcodebuild \
+            -workspace "$CM_BUILD_DIR/Monal/Monal.xcworkspace" \
+            -scheme "Monal Alpha" \
+            -configuration Alpha \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$CM_BUILD_DIR/build/derived-data" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA for later signing
+        script: |
+          set -eu
+          products="$CM_BUILD_DIR/build/derived-data/Build/Products/Alpha-iphoneos"
+          app="$(find "$products" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          if [ -z "$app" ]; then
+            echo "No iPhone .app found in $products" >&2
+            exit 1
+          fi
+          output="$CM_BUILD_DIR/build/ios/ipa"
+          mkdir -p "$output/Payload"
+          /usr/bin/ditto "$app" "$output/Payload/$(basename "$app")"
+          cd "$output"
+          zip -qry -X Monal-alpha-unsigned.ipa Payload
+          echo "Unsigned IPA: $output/Monal-alpha-unsigned.ipa"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/derived-data/Build/Products/Alpha-iphoneos/*.app
