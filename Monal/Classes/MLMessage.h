@@ -21,7 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @interface MLMessage : NSObject <NSSecureCoding>
 
-+(MLMessage*) createMessageFromHistoryID:(NSNumber*) historyID;
++(MLMessage*) createMessageFromHistoryID:(NSNumber*) historyID NS_SWIFT_NAME(createMessage(fromHistoryID:));
 +(NSArray<MLMessage*>*) createMessagesFromHistoryIDs:(NSArray<NSNumber*>*) historyIDs;
 +(MLMessage*) createNewStatusMessageForContact:(MLContact*) contact withText:(NSString*) text;
 -(void) deleteLocally;

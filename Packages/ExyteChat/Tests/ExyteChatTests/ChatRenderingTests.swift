@@ -18,9 +18,10 @@ private struct ConversationTestView: View {
             .photoPickerBackend(.system)
             .automaticallyScrollOnSend(false)
             .onMessageReaction(didReactTo: { _, _ in })
+            .setMessageFont(UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 15), compatibleWith: UITraitCollection(preferredContentSizeCategory: dark ? .extraExtraExtraLarge : .large)))
             .environment(\.colorScheme, dark ? .dark : .light)
             .environment(\.dynamicTypeSize, dark ? .xxxLarge : .large)
-            .environment(\.accessibilityReduceMotion, true)
+            .transaction { $0.disablesAnimations = true }
     }
 }
 
@@ -51,9 +52,16 @@ final class ChatRenderingTests: XCTestCase {
         defer { window.isHidden = true; window.rootViewController = nil }
 
         for dark in [false, true] {
-            fixture.messages = (0..<16).map { i in
-                Message(id: "\(i)", user: i.isMultiple(of: 2) ? me : friend, status: i == 14 ? .queued : .sent, createdAt: Date(timeIntervalSince1970: 1_800_000_000 + Double(i)), text: i == 15 ? "👨‍👩‍👧‍👦 🇨🇦 👍🏽" : "Message \(i). A native conversation with readable content.")
+            window.overrideUserInterfaceStyle = dark ? .dark : .light
+            var initial: [Message] = []
+            for i in 0..<16 {
+                let user = i.isMultiple(of: 2) ? me : friend
+                let status: Message.Status = i == 14 ? .queued : .sent
+                let date = Date(timeIntervalSince1970: 1_800_000_000 + Double(i))
+                let text = i == 15 ? "👨‍👩‍👧‍👦 🇨🇦 👍🏽" : "Message \(i). A native conversation with readable content."
+                initial.append(Message(id: "\(i)", user: user, status: status, createdAt: date, text: text))
             }
+            fixture.messages = initial
             let source = fixture.messages[12]
             var linkedQuote = source.attributedText
             linkedQuote.foregroundColor = .white

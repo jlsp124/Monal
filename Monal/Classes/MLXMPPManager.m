@@ -787,6 +787,10 @@ static const int pingFreqencyMinutes = 5;       //about the same Conversations u
             return nil;
         }
 
+        newMLMessage.replyId = replyId;
+        newMLMessage.replyTo = replyTo;
+        newMLMessage.replyFallbackLength = fallbackLength;
+
         DDLogInfo(@"Sending message...");
         [self sendMessage:message toContact:contact isEncrypted:encrypted isUpload:(uploadInfo != nil) messageId:msgid withCompletionHandler:nil];
         DDLogVerbose(@"Notifying active chats of change for contact %@", contact);
