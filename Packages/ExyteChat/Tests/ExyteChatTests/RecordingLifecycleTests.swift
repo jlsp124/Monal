@@ -52,7 +52,7 @@ final class RecordingLifecycleTests: XCTestCase {
         await recorder.complete(nil)
         await settle()
         XCTAssertEqual(model.state, .empty)
-        XCTAssertNotNil(model.recordingError)
+        XCTAssertNotNil(model.inputError)
     }
 
     func testClosingChatDiscardsPreviewWithoutClearingText() async {

@@ -3,6 +3,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct TextInputView: View {
     
@@ -15,11 +16,14 @@ struct TextInputView: View {
     var style: InputViewStyle
     var availableInputs: [AvailableInputType]
     var localization: ChatLocalization
+    var onPasteImages: ([NSItemProvider]) -> Void = { _ in }
     
     var body: some View {
         TextField("", text: $text, prompt: Text(style == .message ? localization.inputPlaceholder : localization.signatureText)
             .foregroundColor(style == .message ? theme.colors.inputPlaceholderText : theme.colors.inputSignaturePlaceholderText), axis: .vertical)
             .customFocus($globalFocusState.focus, equals: .uuid(inputFieldId))
+            .lineLimit(1...6)
+            .onPasteCommand(of: [.image], perform: onPasteImages)
             .foregroundColor(style == .message ? theme.colors.inputText : theme.colors.inputSignatureText)
             .padding(.vertical, 10)
             .padding(.leading, !isAttachmentsAvailable() ? 12 : 0)

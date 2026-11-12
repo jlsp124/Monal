@@ -82,13 +82,13 @@ struct InputView: View {
             tapDelayTimer?.invalidate()
             tapDelayTimer = nil
         }
-        .alert("Voice recording", isPresented: Binding(
-            get: { viewModel.recordingError != nil },
-            set: { if !$0 { viewModel.recordingError = nil } }
+        .alert("Message", isPresented: Binding(
+            get: { viewModel.inputError != nil },
+            set: { if !$0 { viewModel.inputError = nil } }
         )) {
-            Button("Close", role: .cancel) { viewModel.recordingError = nil }
+            Button("Close", role: .cancel) { viewModel.inputError = nil }
         } message: {
-            Text(viewModel.recordingError ?? "")
+            Text(viewModel.inputError ?? "")
         }
         .onDrag(towards: .bottom, ofAmount: 100...) {
             keyboardState.resignFirstResponder()
@@ -151,13 +151,13 @@ struct InputView: View {
                     inputFieldId: inputFieldId,
                     style: style,
                     availableInputs: availableInputs,
-                    localization: localization
+                    localization: localization,
+                    onPasteImages: viewModel.pasteImages
                 )
 #if targetEnvironment(macCatalyst)
                 .onChange(of: viewModel.text) { newValue in
                     if newValue.last == "\n" {
                         viewModel.text.removeLast()
-                        onAction(.send)
                     }
                 }
 #endif

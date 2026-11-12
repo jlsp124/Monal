@@ -22,7 +22,7 @@ final class InputViewModel: ObservableObject {
     @Published var mediaPickerMode = MediaPickerMode.photos
 
     @Published var showActivityIndicator = false
-    @Published var recordingError: String?
+    @Published var inputError: String?
 
     var recordingPlayer: RecordingPlayer?
     var didSendMessage: ((DraftMessage) -> Void)?
@@ -33,6 +33,8 @@ final class InputViewModel: ObservableObject {
     private var recordingTask: Task<Void, Never>?
     private var recordingCleanupTask: Task<Void, Never>?
     private var isSending = false
+    private var pasteGeneration = UUID()
+    private var pastedImageURLs = Set<URL>()
 
     init(recorder: any AudioRecording = Recorder()) {
         self.recorder = recorder
@@ -68,11 +70,15 @@ final class InputViewModel: ObservableObject {
     }
 
     func onStop() {
+        pasteGeneration = UUID()
         cancelRecording()
         subscriptions.removeAll()
     }
 
     func reset() {
+        pasteGeneration = UUID()
+        for url in pastedImageURLs { try? FileManager.default.removeItem(at: url) }
+        pastedImageURLs.removeAll()
         text = ""
         attachments = InputViewAttachments()
         state = .empty
@@ -183,6 +189,36 @@ final class InputViewModel: ObservableObject {
         }
     }
 
+    // Called only by a user-initiated native Paste action. Never inspect the
+    // pasteboard while rendering, focusing or opening a conversation.
+    func pasteImages(_ providers: [NSItemProvider]) {
+        let generation = pasteGeneration
+        for provider in providers.prefix(10) where provider.canLoadObject(ofClass: UIImage.self) {
+            provider.loadObject(ofClass: UIImage.self) { [weak self] object, error in
+                Task { @MainActor in
+                    guard let self, self.pasteGeneration == generation else { return }
+                    guard let image = object as? UIImage, let data = image.pngData() else {
+                        self.inputError = "Could not paste the image. Try choosing it from Photos."
+                        return
+                    }
+                    do {
+                        let url = FileManager.tempDirPath.appendingPathComponent("Pasted-\(UUID().uuidString).png")
+                        try data.write(to: url, options: .atomic)
+                        self.pastedImageURLs.insert(url)
+                        self.attachments.files.append(url)
+                    } catch {
+                        self.inputError = "Could not prepare the pasted image."
+                    }
+                }
+            }
+        }
+    }
+
+    func removeFile(_ url: URL) {
+        attachments.files.removeAll { $0 == url }
+        if pastedImageURLs.remove(url) != nil { try? FileManager.default.removeItem(at: url) }
+    }
+
     private func recordAudio(holding: Bool) {
         guard attachments.recording == nil else { return }
         let generation = UUID()
@@ -209,7 +245,7 @@ final class InputViewModel: ObservableObject {
             }
             guard let url else {
                 cancelRecording()
-                recordingError = "Could not start recording. Check microphone access in Settings and try again."
+                inputError = "Could not start recording. Check microphone access in Settings and try again."
                 return
             }
             if state == .waitingForRecordingPermission { state = .isRecordingTap }
@@ -284,6 +320,8 @@ private extension InputViewModel {
         )
         didSendMessage?(draft)
         showActivityIndicator = false
+        // The host now owns these upload URLs. Do not delete them in reset().
+        pastedImageURLs.removeAll()
         reset()
     }
 }

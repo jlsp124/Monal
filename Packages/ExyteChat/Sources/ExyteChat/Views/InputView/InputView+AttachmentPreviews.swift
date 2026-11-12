@@ -10,6 +10,20 @@ extension InputView {
 
     @ViewBuilder
     var viewOnTop: some View {
+        if !viewModel.attachments.files.isEmpty {
+            ForEach(viewModel.attachments.files, id: \.self) { url in
+                HStack {
+                    Label(url.lastPathComponent, systemImage: "doc")
+                        .font(.caption)
+                        .lineLimit(1)
+                    Spacer()
+                    Button { viewModel.removeFile(url) } label: { Image(systemName: "xmark.circle.fill") }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel(Text("Remove attachment"))
+                }
+                .padding(.horizontal, 16)
+            }
+        }
         if style == .message, photoPickerBackend == .system, !viewModel.attachments.medias.isEmpty {
             mediaAttachmentsPreview
         }
