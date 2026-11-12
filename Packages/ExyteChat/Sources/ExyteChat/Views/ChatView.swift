@@ -360,6 +360,11 @@ public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction:
             viewModel.scrollToReply = { id in
                 self.pendingScrollTo = ScrollToParams(messageID: id, position: .middle)
             }
+            viewModel.canReactTo = { chatCustomizationParameters.reactionDelegate?.canReact(to: $0) ?? false }
+            viewModel.reactToEmoji = { message, emoji in
+                guard let delegate = chatCustomizationParameters.reactionDelegate, delegate.canReact(to: message) else { return }
+                delegate.didReact(to: message, reaction: DraftReaction(messageID: message.id, type: .emoji(emoji)))
+            }
             viewModel.didSendMessage = didSendMessage
             viewModel.inputViewModel = inputViewModel
             viewModel.globalFocusState = globalFocusState

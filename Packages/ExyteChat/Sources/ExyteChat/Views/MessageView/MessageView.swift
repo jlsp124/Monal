@@ -77,16 +77,6 @@ struct MessageView: View {
         return .vstack
     }
 
-    var reactionViewWidth: CGFloat {
-        struct Cache { static var value: CGFloat? }
-        if let value = Cache.value { return value }
-
-        let value = AttributedString("🙃️️️️").width(withConstrainedWidth: chatSize.width, font: params.font) + ReactionBubble.padding * 2
-
-        Cache.value = value
-        return value
-    }
-
     var showAvatar: Bool {
         isDisplayingMessageMenu
             || positionInUserGroup == .single
@@ -150,7 +140,7 @@ struct MessageView: View {
     func bubbleView(_ message: Message) -> some View {
         VStack(
             alignment: message.user.isCurrentUser ? .leading : .trailing,
-            spacing: -reactionViewWidth / 3
+            spacing: 4
         ) {
             if !isDisplayingMessageMenu && !message.reactions.isEmpty {
                 reactionsView(message)
