@@ -35,7 +35,7 @@ jobs:
           show-progress: true
           lfs: true
       - name: Checkout submodules
-        run: git submodule update -f --init --remote
+        run: git submodule update --init --recursive
       - name: Select Xcode version
         run: sudo xcode-select -s '/Applications/Xcode_26.2.app/Contents/Developer'
       - name: Install coreutils
@@ -57,11 +57,13 @@ jobs:
         working-directory: Monal
         run: |
           mkdir -p "$RUNNER_TEMP/test-artifacts"
+          device="$(python3 ../scripts/prepare-ios-simulator.py)"
+          cp ../build/simulator.json "$RUNNER_TEMP/test-artifacts/simulator.json"
           set -o pipefail && \
           NSUnbufferedIO=YES xcodebuild \
             -workspace Monal.xcworkspace \
             -scheme Monal \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination "platform=iOS Simulator,id=$device" \
             -resultBundlePath "$RUNNER_TEMP/test-artifacts/TestResults.xcresult" \
             test \
             2>&1 | \
@@ -129,6 +131,7 @@ jobs:
           path: |
             build/*-build.log
             build/ios-testing/launch
+            build/simulator.json
           retention-days: 14
 
   chat_component_tests:
@@ -147,4 +150,5 @@ jobs:
             build/chat-schemes.json
             build/chat-results.xcresult
             build/chat-screenshots
+            build/simulator.json
           retention-days: 14

@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../Packages/ExyteChat"
 root="$(cd ../.. && pwd)"
+device="$(python3 "$root/scripts/prepare-ios-simulator.py")"
 xcodebuild -list -json > "$root/build/chat-schemes.json"
 scheme="$(python3 - "$root/build/chat-schemes.json" <<'PY'
 import json,sys
@@ -15,7 +16,7 @@ else:
     raise SystemExit(f'No chat package test scheme in {schemes}')
 PY
 )"
-xcodebuild -scheme "$scheme" -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+xcodebuild -scheme "$scheme" -destination "platform=iOS Simulator,id=$device" \
     -derivedDataPath "$root/build/chat-tests" \
     -resultBundlePath "$root/build/chat-results.xcresult" test > "$root/build/chat-tests.log" 2>&1 || {
     tail -130 "$root/build/chat-tests.log"; exit 1;

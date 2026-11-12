@@ -5,9 +5,7 @@ cd "$(dirname "$0")/.."
 build="${1:-$PWD/build/ios-testing}"
 app="$build/DerivedData/Build/Products/Alpha-iphonesimulator/Monal.alpha.app"
 mkdir -p "$build/launch"
-device="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; print(next(d["udid"] for group in devices.values() for d in group if d["name"] == "iPhone 16"))')"
-xcrun simctl boot "$device" || true
-xcrun simctl bootstatus "$device" -b
+device="$(python3 scripts/prepare-ios-simulator.py)"
 xcrun simctl install "$device" "$app"
 for attempt in cold relaunch; do
     launch="$(xcrun simctl launch --terminate-running-process "$device" monal.alpha)"

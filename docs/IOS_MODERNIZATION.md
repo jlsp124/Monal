@@ -56,7 +56,7 @@ The resulting IPA is **unsigned**. AltServer or another compatible signer must s
 
 ## Validation
 
-The fork's `test.yml` manual dispatch accepts `tests`, `chat`, `launch` and `integration`. `integration` runs the existing Monal tests, isolated ExyteChat tests, device build/package validation, and a simulator build/install/cold-launch/relaunch check. Simulator launch monitoring checks survival for 20 seconds twice and saves screenshots/runtime logs. Tests do not run the Codemagic service itself; both systems use the same checked-in build/package scripts.
+The fork's `test.yml` manual dispatch accepts `tests`, `chat`, `launch` and `integration`. `integration` runs the existing Monal tests, isolated ExyteChat tests, device build/package validation, and a simulator build/install/cold-launch/relaunch check. The shared simulator helper initializes CoreSimulator, selects an available iPhone by UUID for the selected SDK, and installs a compatible Apple runtime if the runner lacks one. The selected runtime/device is recorded in `simulator.json`. Submodules stay at their committed revisions. Simulator launch monitoring checks survival for 20 seconds twice and saves screenshots/runtime logs. Tests do not run the Codemagic service itself; both systems use the same checked-in build/package scripts.
 
 Baseline build/launch run: [43126691257](https://github.com/jlsp124/Monal/actions/runs/43126691257). Both SDK builds and unsigned package creation passed. The simulator showed Monal's onboarding screen and survived cold launch and relaunch. This baseline predates the remaining feature groups.
 
