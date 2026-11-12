@@ -32,7 +32,7 @@ final class ChatViewModel: ObservableObject {
     let messageRecordingPlayer = RecordingPlayer()
 
     var scrollToReply: (String) -> Void = { _ in }
-    var canReactTo: (Message) -> Bool = { _ in false }
+    @Published var canReactTo: (Message) -> Bool = { _ in false }
     var reactToEmoji: (Message, String) -> Void = { _, _ in }
     var didSendMessage: (DraftMessage) -> Void = {_ in }
     var didUpdateAttachmentStatus: (AttachmentUploadUpdate) -> Void = { _ in }
@@ -113,7 +113,7 @@ final class ChatViewModel: ObservableObject {
         case .copy:
             UIPasteboard.general.string = String(message.attributedText.characters)
         case .reply:
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.2)) {
                 inputViewModel?.attachments.replyMessage = message.toReplyMessage()
             }
             focusTheInputTextView()

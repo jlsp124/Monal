@@ -47,7 +47,7 @@ struct MessageStatusView: View {
                         .resizable()
                 }
                 .foregroundColor(theme.colors.statusError)
-                .accessibilityLabel(Text("Failed. Retry message"))
+                .accessibilityLabel(Text("Failed. Show message actions"))
             }
         }
     }

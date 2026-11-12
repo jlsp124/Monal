@@ -111,8 +111,8 @@ struct MessageView: View {
 
             if message.user.isCurrentUser, let status = message.status {
                 MessageStatusView(status: status) {
-                    if case let .error(draft) = status {
-                        // Do nothing when the error status icon is clicked
+                    if case .error = status {
+                        viewModel.messageMenuRow = MessageRow(message: message, positionInUserGroup: positionInUserGroup, positionInMessagesSection: positionInMessagesSection, commentsPosition: nil)
                     }
                 }
                 .viewSize(MessageView.statusViewWidth)
