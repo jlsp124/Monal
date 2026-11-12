@@ -3,7 +3,7 @@
 //  monalxmpp
 //
 //  Created by Friedrich Altheide on 15.01.22.
-//  Copyright Â© 2022 Monal.im. All rights reserved.
+//  Copyright © 2022 Monal.im. All rights reserved.
 //
 
 #import <monalxmpp/MLSQLite.h>

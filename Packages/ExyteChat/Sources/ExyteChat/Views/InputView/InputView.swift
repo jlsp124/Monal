@@ -101,15 +101,7 @@ struct InputView: View {
         ) { result in
             switch result {
             case .success(let files):
-                files.forEach { file in
-                    // gain access to the directory
-                    let gotAccess = file.startAccessingSecurityScopedResource()
-                    if !gotAccess { return }
-                    viewModel.attachments.files.append(file)
-                    // release access
-                    file.stopAccessingSecurityScopedResource()
-               }
-               onAction(.send)
+                viewModel.attachments.files.append(contentsOf: files)
             case .failure(let error):
                print(error)
             }
@@ -118,7 +110,7 @@ struct InputView: View {
 
     @ViewBuilder
     var leftView: some View {
-        if [.isRecordingTap, .isRecordingHold, .hasRecording, .playingRecording, .pausedRecording].contains(state) {
+        if [.waitingForRecordingPermission, .isRecordingTap, .isRecordingHold, .hasRecording, .playingRecording, .pausedRecording].contains(state) {
             deleteRecordButton
         } else {
             switch style {

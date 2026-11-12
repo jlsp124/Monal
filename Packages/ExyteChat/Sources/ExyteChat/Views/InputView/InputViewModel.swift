@@ -46,6 +46,7 @@ final class InputViewModel: ObservableObject {
 
     private var recordPlayerSubscription: AnyCancellable?
     private var subscriptions = Set<AnyCancellable>()
+    private var validationSubscriptions = Set<AnyCancellable>()
     
     func setRecorderSettings(recorderSettings: RecorderSettings = RecorderSettings()) {
         Task {
@@ -74,6 +75,7 @@ final class InputViewModel: ObservableObject {
     func onStop() {
         pasteGeneration = UUID()
         cancelRecording()
+        validationSubscriptions.removeAll()
         subscriptions.removeAll()
     }
 
@@ -252,7 +254,7 @@ final class InputViewModel: ObservableObject {
                 inputError = "Could not start recording. Check microphone access in Settings and try again."
                 return
             }
-            if state == .waitingForRecordingPermission { state = .isRecordingTap }
+            if state == .waitingForRecordingPermission { state = holding ? .isRecordingHold : .isRecordingTap }
             attachments.recording?.url = url
             if hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
         }
@@ -264,7 +266,7 @@ private extension InputViewModel {
     func validateDraft() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            guard state != .editing else { return } // special case
+            guard state != .editing, attachments.recording == nil else { return }
             let hasAttachments = !self.attachments.medias.isEmpty || !self.attachments.files.isEmpty || self.attachments.staticLocation != nil || self.attachments.liveLocation != nil
             if !self.text.isEmpty || hasAttachments {
                 self.state = .hasTextOrMedia
@@ -277,15 +279,16 @@ private extension InputViewModel {
     }
 
     func subscribeValidation() {
+        validationSubscriptions.removeAll()
         $attachments.sink { [weak self] _ in
             self?.validateDraft()
         }
-        .store(in: &subscriptions)
+        .store(in: &validationSubscriptions)
 
         $text.sink { [weak self] _ in
             self?.validateDraft()
         }
-        .store(in: &subscriptions)
+        .store(in: &validationSubscriptions)
     }
 
     func subscribeRecordPlayer() {

@@ -77,4 +77,31 @@ final class RecordingLifecycleTests: XCTestCase {
         XCTAssertEqual(drafts.count, 1)
         XCTAssertEqual(drafts.first?.text, "hello")
     }
+
+    func testRecordingStateSurvivesAnExistingTextDraft() async {
+        let recorder = TestRecorder()
+        let model = InputViewModel(recorder: recorder)
+        model.onStart()
+        model.text = "Keep my draft"
+        model.inputViewAction()(.recordAudioTap)
+        await recorder.waitForStart()
+        await recorder.complete(URL(fileURLWithPath: "/tmp/test-recording.aac"))
+        await settle()
+        XCTAssertEqual(model.state, .isRecordingTap)
+        XCTAssertEqual(model.text, "Keep my draft")
+        model.cancelRecording()
+        XCTAssertEqual(model.state, .hasTextOrMedia)
+    }
+
+    func testBackgroundingDiscardsRecordingAndPreservesDraft() async {
+        let model = InputViewModel(recorder: TestRecorder())
+        model.onStart()
+        model.text = "Draft"
+        model.attachments.recording = Recording()
+        model.state = .hasRecording
+        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+        await settle()
+        XCTAssertNil(model.attachments.recording)
+        XCTAssertEqual(model.text, "Draft")
+    }
 }

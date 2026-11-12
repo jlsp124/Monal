@@ -121,7 +121,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
                         || context.coordinator.sections.isEmpty
                         || pendingScrollTo != nil { // if we're gonna scroll later, then update cells without animation, and animate scrolling later
                         updateTableNoAnimation(tableView, context.coordinator)
-                    } else if animationMode == .natural, tableView.contentOffset == .zero {
+                    } else if animationMode == .natural, tableView.contentOffset.y <= -tableView.adjustedContentInset.top + 1 {
                         await updateTableWithAnimation(tableView, context.coordinator)
                     } else {
                         // if transaction.animationMode == .keepStable
@@ -796,7 +796,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
             let maxTopOffset = scrollView.contentSize.height - scrollView.frame.height - 1
 
             chatParams.onContentOffsetChange?(contentOffset)
-            isScrolledToBottom = contentOffset <= 0
+            isScrolledToBottom = contentOffset <= -scrollView.adjustedContentInset.top + 1
             isScrolledToTop = contentOffset >= maxTopOffset
 
             guard !sections.isEmpty, !updateInProgress else { return }
