@@ -1111,8 +1111,8 @@ class ChatViewMessage: ExyteChat.Message {
             return ""
         }
         if innerMessage.retracted { return NSLocalizedString("This message got retracted", comment: "") }
-        let body = innerMessage.messageText
-        let length = Int(innerMessage.replyFallbackLength)
+        let body = innerMessage.obj.messageText
+        let length = Int(innerMessage.obj.replyFallbackLength)
         if replyMessage != nil, length > 0, length <= body.unicodeScalars.count {
             return String(String.UnicodeScalarView(body.unicodeScalars.dropFirst(length)))
         }

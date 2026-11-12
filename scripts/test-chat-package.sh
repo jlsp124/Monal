@@ -19,6 +19,7 @@ PY
 xcodebuild -scheme "$scheme" -destination "platform=iOS Simulator,id=$device" \
     -derivedDataPath "$root/build/chat-tests" \
     -resultBundlePath "$root/build/chat-results.xcresult" test > "$root/build/chat-tests.log" 2>&1 || {
+    sed -n '/error:/p' "$root/build/chat-tests.log"
     tail -130 "$root/build/chat-tests.log"; exit 1;
 }
 tail -45 "$root/build/chat-tests.log"

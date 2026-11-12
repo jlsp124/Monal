@@ -14,6 +14,7 @@ xcodebuild -workspace "$PWD/Monal/Monal.xcworkspace" -scheme 'Monal Alpha' \
     -configuration Alpha -sdk "$sdk" -destination "$destination" \
     -derivedDataPath "$output/DerivedData" ENABLE_DEBUG_DYLIB=NO \
     "${signing[@]}" build > "$output-build.log" 2>&1 || {
+    sed -n '/error:/p' "$output-build.log"
     tail -100 "$output-build.log"; exit 1;
 }
 app="$output/DerivedData/Build/Products/Alpha-$sdk/Monal.alpha.app"
