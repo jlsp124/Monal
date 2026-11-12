@@ -13,6 +13,7 @@ struct MessageView: View {
     @Environment(\.chatTheme) var theme
     @Environment(\.chatSize) var chatSize
     @Environment(\.chatLocalization) var localization
+    @ScaledMetric(relativeTo: .body) var reactionRowHeight: CGFloat = 44
 
     @ObservedObject var viewModel: ChatViewModel
 
@@ -103,13 +104,6 @@ struct MessageView: View {
             VStack(alignment: message.user.isCurrentUser ? .trailing : .leading, spacing: 2) {
                 if !isDisplayingMessageMenu, let reply = message.replyMessage?.toMessage() {
                     replyBubbleView(reply)
-                        .opacity(theme.style.replyOpacity)
-                        .padding(message.user.isCurrentUser ? .trailing : .leading, 10)
-                        .overlay(alignment: message.user.isCurrentUser ? .trailing : .leading) {
-                            Capsule()
-                                .foregroundColor(theme.colors.mainTint)
-                                .frame(width: 2)
-                        }
                 }
 
                 bubbleView(message)
@@ -211,7 +205,7 @@ struct MessageView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(quoted.user.name)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(theme.colors.mainTint)
+                .foregroundStyle(theme.colors.mainText)
             if quoted.hasText {
                 Text(quoted.attributedText.replyPreviewText)
                     .font(.caption)

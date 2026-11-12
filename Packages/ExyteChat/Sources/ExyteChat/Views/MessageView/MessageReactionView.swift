@@ -39,5 +39,6 @@ extension MessageView {
                 }
             }
         }
+        .frame(height: max(44, reactionRowHeight))
     }
 }
