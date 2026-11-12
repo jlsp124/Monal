@@ -26,6 +26,7 @@ struct InputView: View {
     var recorderSettings: RecorderSettings = RecorderSettings()
     var audioRecordingMode: AudioRecordingMode = .holdToRecord
     var photoPickerBackend: PhotoPickerBackend = .custom
+    var hapticsEnabled = true
     var localization: ChatLocalization
 
     @State var stopRecordButtonSize: CGSize = .zero
@@ -74,7 +75,9 @@ struct InputView: View {
         .onAppear {
             viewModel.recordingPlayer = recordingPlayer
             viewModel.setRecorderSettings(recorderSettings: recorderSettings)
+            viewModel.hapticsEnabled = hapticsEnabled
         }
+        .onChange(of: hapticsEnabled) { _, enabled in viewModel.hapticsEnabled = enabled }
         .onDisappear {
             tapDelayTimer?.invalidate()
             tapDelayTimer = nil

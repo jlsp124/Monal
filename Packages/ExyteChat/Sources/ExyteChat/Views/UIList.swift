@@ -522,7 +522,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
         // helpers to avoid queueing same updates multiple times
         var latestUpdateSections: [MessagesSection] = []
 
-        private let impactGenerator = UIImpactFeedbackGenerator(style: .heavy)
+        private let impactGenerator = UIImpactFeedbackGenerator(style: .light)
 
         init(
             viewModel: ChatViewModel,
@@ -708,7 +708,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
                     )
                     .onLongPressGesture {
                         // Trigger haptic feedback
-                        self.impactGenerator.impactOccurred()
+                        if self.chatParams.hapticsEnabled { self.impactGenerator.impactOccurred() }
                         // Launch the message menu
                         self.viewModel.messageMenuRow = row
                     }

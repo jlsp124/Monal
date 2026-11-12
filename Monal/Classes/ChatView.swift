@@ -81,6 +81,11 @@ extension MonalView {
 */
 
 class ChatViewDefaultsDB: ObservableObject {
+    @defaultsDB("ChatReplySwipeDirection")
+    var chatReplySwipeDirection: Int
+
+    @defaultsDB("ChatHapticsEnabled")
+    var chatHapticsEnabled: Bool
     @defaultsDB("SendLastChatState")
     var sendLastChatState: Bool
 
@@ -134,10 +139,12 @@ struct ChatView: View {
     }
 
     enum MessageAction: MessageMenuAction {
-        case copy, edit, retract, moderate, delete, resend
+        case reply, copy, edit, retract, moderate, delete, resend
 
         func title() -> String {
             switch self {
+                case .reply:
+                    "Reply"
                 case .copy:
                     "Copy"
                 case .edit:
@@ -155,6 +162,8 @@ struct ChatView: View {
 
         func icon() -> Image {
             switch self {
+                case .reply:
+                    Image(systemName: "arrowshape.turn.up.left")
                 case .copy:
                     Image(systemName: "doc.on.doc")
                 case .edit:
@@ -182,7 +191,7 @@ struct ChatView: View {
             if case .error = message.status {
                 return [.resend, .delete]
             }
-            var availableActions: [MessageAction] = []
+            var availableActions: [MessageAction] = [.reply]
             if message.hasText {
                 availableActions.append(.copy)
             }
@@ -484,6 +493,21 @@ struct ChatView: View {
         self.isUploadingFile = false
     }
 
+    private func replySwipeActions(left: Bool) -> [SwipeAction] {
+        let direction = chatViewDefaultsDB.chatReplySwipeDirection
+        guard direction == 2 || direction == (left ? 0 : 1) else { return [] }
+        return [SwipeAction(action: { message, action in
+            if chatViewDefaultsDB.chatHapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+            action(message, .reply)
+        }, activeFor: { message in
+            !(message as! ChatViewMessage).innerMessage.retracted
+        }, background: .accentColor) {
+            Label("Reply", systemImage: "arrowshape.turn.up.left")
+                .foregroundStyle(.white)
+                .padding(8)
+        }]
+    }
+
     var body: some View {
         ExyteChatView(messages: messages, chatType: .conversation, replyMode: .quote) { draft in
             if !draft.medias.isEmpty || draft.recording != nil || !draft.files.isEmpty {
@@ -523,6 +547,8 @@ struct ChatView: View {
             let mlMessage = (message as! ChatViewMessage).innerMessage.obj
             let messageDBId = mlMessage.messageDBId
             switch action {
+                case .reply:
+                    defaultActionClosure(message, .reply)
                 case .copy:
                     defaultActionClosure(message, .copy)
                 case .edit:
@@ -614,25 +640,12 @@ struct ChatView: View {
                     }
             }
         }
-        /*
-        .swipeActions(edge: .leading, performsFirstActionWithFullSwipe: true, items: [
-            SwipeAction(action: { (message, defaultActionClosure) in
-                defaultActions(message, .reply)
-            }, activeFor: { !$0.user.isCurrentUser }, background: .blue) {
-                VStack {
-                    Image(systemName: "arrowshape.turn.up.left")
-                        .imageScale(.large)
-                        .foregroundStyle(.white)
-                        .frame(height: 30)
-                    Text("Reply")
-                        .foregroundStyle(.white)
-                        .font(.footnote)
-                }
-            }
-        ])
-        */
+        .swipeActions(edge: .trailing, performsFirstActionWithFullSwipe: true, items: replySwipeActions(left: true))
+        .swipeActions(edge: .leading, performsFirstActionWithFullSwipe: true, items: replySwipeActions(left: false))
+        .hapticsEnabled(chatViewDefaultsDB.chatHapticsEnabled)
         .onMessageReaction(didReactTo: { message, reaction in
             let mlMessage = (message as! ChatViewMessage).innerMessage.obj
+            if chatViewDefaultsDB.chatHapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
             switch reaction.type {
                 case .emoji(let emoji):
                     var currentReactions: NSMutableOrderedSet = []

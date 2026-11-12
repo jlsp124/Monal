@@ -53,6 +53,11 @@ func getNotificationPrivacyOption(_ option: NotificationPrivacySettingOption) ->
 }
 
 class GeneralSettingsDefaultsDB: ObservableObject {
+    @defaultsDB("ChatReplySwipeDirection")
+    var chatReplySwipeDirection: Int
+
+    @defaultsDB("ChatHapticsEnabled")
+    var chatHapticsEnabled: Bool
     @defaultsDB("NotificationPrivacySetting")
     var notificationPrivacySetting: Int
     
@@ -256,6 +261,13 @@ struct UserInterfaceSettings: View {
             }
             
             Section(header: Text("Input")) {
+                Picker("Swipe to reply", selection: $generalSettingsDefaultsDB.chatReplySwipeDirection) {
+                    Text("Left").tag(0)
+                    Text("Right").tag(1)
+                    Text("Both directions").tag(2)
+                    Text("Disabled").tag(3)
+                }
+                Toggle("Application haptics", isOn: $generalSettingsDefaultsDB.chatHapticsEnabled)
                 SettingsToggle(isOn: $generalSettingsDefaultsDB.showKeyboardOnChatOpen) {
                     Text("Autofocus text input on chat open")
                     Text("Will focus the textfield on macOS or iOS with hardware keyboard attached, will open the software keyboard otherwise.")

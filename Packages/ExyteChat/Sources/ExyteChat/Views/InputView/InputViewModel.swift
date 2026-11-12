@@ -26,6 +26,7 @@ final class InputViewModel: ObservableObject {
 
     var recordingPlayer: RecordingPlayer?
     var didSendMessage: ((DraftMessage) -> Void)?
+    var hapticsEnabled = true
 
     private let recorder: any AudioRecording
     private var recordingGeneration = UUID()
@@ -137,12 +138,14 @@ final class InputViewModel: ObservableObject {
                 guard recordingGeneration == generation else { return }
                 if let recording = attachments.recording, recording.url != nil {
                     state = .hasRecording
+                    if hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
                 } else {
                     cancelRecording()
                 }
                 await recordingPlayer?.reset()
             }
         case .deleteRecord:
+            if hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
             cancelRecording()
         case .playRecord:
             state = .playingRecording
@@ -211,6 +214,7 @@ final class InputViewModel: ObservableObject {
             }
             if state == .waitingForRecordingPermission { state = .isRecordingTap }
             attachments.recording?.url = url
+            if hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
         }
     }
 }

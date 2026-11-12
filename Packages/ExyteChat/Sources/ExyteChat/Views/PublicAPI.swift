@@ -145,6 +145,12 @@ public extension ChatView {
         return view
     }
 
+    func hapticsEnabled(_ enabled: Bool) -> ChatView {
+        var view = self
+        view.chatCustomizationParameters.hapticsEnabled = enabled
+        return view
+    }
+
     /// receive scrolling offset updates
     func onContentOffsetChange(_ closure: @escaping (CGFloat) -> Void) -> ChatView {
         var view = self
