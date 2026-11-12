@@ -63,18 +63,19 @@ final class InputViewModel: ObservableObject {
             .merge(with: NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification))
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
+                guard let self, !self.isSending else { return }
                 if notification.name == AVAudioSession.interruptionNotification,
                    notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt != AVAudioSession.InterruptionType.began.rawValue {
                     return
                 }
-                self?.cancelRecording()
+                self.cancelRecording()
             }
             .store(in: &subscriptions)
     }
 
     func onStop() {
         pasteGeneration = UUID()
-        cancelRecording()
+        if !isSending { cancelRecording() }
         validationSubscriptions.removeAll()
         subscriptions.removeAll()
     }
@@ -179,6 +180,7 @@ final class InputViewModel: ObservableObject {
     }
 
     func cancelRecording() {
+        guard attachments.recording != nil else { return }
         recordingGeneration = UUID()
         recordingTask?.cancel()
         recordingTask = nil

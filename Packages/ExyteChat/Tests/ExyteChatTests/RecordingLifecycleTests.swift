@@ -21,6 +21,27 @@ private actor TestRecorder: AudioRecording {
     func cancelRecording() {}
 }
 
+private actor StopGateRecorder: AudioRecording {
+    var isAllowedToRecordAudio: Bool { true }
+    private var gate: CheckedContinuation<Void, Never>?
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var stopping = false
+    func startRecording(durationProgressHandler: @escaping Recorder.ProgressHandler) async -> URL? { nil }
+    func stopRecording() async {
+        await withCheckedContinuation {
+            gate = $0
+            stopping = true
+            waiters.forEach { $0.resume() }
+            waiters.removeAll()
+        }
+    }
+    func waitForStop() async {
+        if !stopping { await withCheckedContinuation { waiters.append($0) } }
+    }
+    func releaseStop() { gate?.resume(); gate = nil }
+    func cancelRecording() {}
+}
+
 @MainActor
 final class RecordingLifecycleTests: XCTestCase {
     private func settle() async {
@@ -103,5 +124,46 @@ final class RecordingLifecycleTests: XCTestCase {
         await settle()
         XCTAssertNil(model.attachments.recording)
         XCTAssertEqual(model.text, "Draft")
+    }
+
+    func testLifecycleDoesNotExitOrdinaryMessageEditing() async {
+        for closeChat in [false, true] {
+            let model = InputViewModel(recorder: TestRecorder())
+            model.onStart()
+            model.text = "Edited text"
+            var saved = ""
+            var sends = 0
+            model.didSendMessage = { _ in sends += 1 }
+            model.edit { saved = $0 }
+            if closeChat { model.onStop(); model.onStart() }
+            else { NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil) }
+            await settle()
+            XCTAssertEqual(model.state, .editing)
+            model.inputViewAction()(.saveEdit)
+            XCTAssertEqual(saved, "Edited text")
+            XCTAssertEqual(sends, 0)
+        }
+    }
+
+    func testConfirmedSendSurvivesBackgroundingOrClosingWhileAudioStops() async {
+        for closeChat in [false, true] {
+            let recorder = StopGateRecorder()
+            let model = InputViewModel(recorder: recorder)
+            model.onStart()
+            let url = URL(fileURLWithPath: "/tmp/confirmed-send.aac")
+            model.attachments.recording = Recording(duration: 2, url: url)
+            model.state = .hasRecording
+            var drafts: [DraftMessage] = []
+            model.didSendMessage = { drafts.append($0) }
+            model.send()
+            await recorder.waitForStop()
+            if closeChat { model.onStop() }
+            else { NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil) }
+            await settle()
+            await recorder.releaseStop()
+            await settle()
+            XCTAssertEqual(drafts.count, 1)
+            XCTAssertEqual(drafts.first?.recording?.url, url)
+        }
     }
 }
