@@ -3,7 +3,7 @@
 //  Monal
 //
 //  Created by Anurodh Pokharel on 11/27/19.
-//  Copyright Ã‚Â© 2019 Monal.im. All rights reserved.
+//  Copyright © 2019 Monal.im. All rights reserved.
 //
 
 #import <monalxmpp/MLMessage.h>

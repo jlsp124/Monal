@@ -22,11 +22,11 @@
     if(replyId.length == 0) return;
     NSMutableDictionary* attributes = [@{@"id": replyId} mutableCopy];
     if(to.length > 0) attributes[@"to"] = to;
-    [self addChildNode:[[MLXMLNode alloc] initWithElement:@"reply" andNamespace:@"urn:xmpp:reply:0" withAttributes:attributes andChildren:@[]]];
+    [self addChildNode:[[MLXMLNode alloc] initWithElement:@"reply" andNamespace:@"urn:xmpp:reply:0" withAttributes:attributes andChildren:@[] andData:nil]];
     if(length > 0)
         [self addChildNode:[[MLXMLNode alloc] initWithElement:@"fallback" andNamespace:@"urn:xmpp:fallback:0" withAttributes:@{@"for": @"urn:xmpp:reply:0"} andChildren:@[
-            [[MLXMLNode alloc] initWithElement:@"body" withAttributes:@{@"start": @"0", @"end": [@(length) stringValue]} andChildren:@[]]
-        ]]];
+            [[MLXMLNode alloc] initWithElement:@"body" withAttributes:@{@"start": @"0", @"end": [@(length) stringValue]} andChildren:@[] andData:nil]
+        ] andData:nil]];
 }
 
 +(NSUInteger) replyFallbackLengthForBody:(NSString*) body inMessage:(MLXMLNode*) node
