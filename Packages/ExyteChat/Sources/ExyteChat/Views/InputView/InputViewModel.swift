@@ -81,6 +81,7 @@ final class InputViewModel: ObservableObject {
     }
 
     func reset() {
+        if !isSending { cancelRecording() }
         pasteGeneration = UUID()
         for url in pastedImageURLs { try? FileManager.default.removeItem(at: url) }
         pastedImageURLs.removeAll()
@@ -110,6 +111,7 @@ final class InputViewModel: ObservableObject {
     }
 
     func edit(_ closure: @escaping (String) -> Void) {
+        cancelRecording()
         saveEditingClosure = closure
         state = .editing
     }
@@ -228,7 +230,7 @@ final class InputViewModel: ObservableObject {
     }
 
     private func recordAudio(holding: Bool) {
-        guard attachments.recording == nil else { return }
+        guard state != .editing, attachments.recording == nil else { return }
         let generation = UUID()
         recordingGeneration = generation
         state = .waitingForRecordingPermission

@@ -166,4 +166,21 @@ final class RecordingLifecycleTests: XCTestCase {
             XCTAssertEqual(drafts.first?.recording?.url, url)
         }
     }
+
+    func testEditingDiscardsRecordingAndKeepsNormalEditControls() async {
+        let model = InputViewModel(recorder: TestRecorder())
+        model.onStart()
+        model.text = "Edited message"
+        model.attachments.recording = Recording(url: URL(fileURLWithPath: "/tmp/edit-discard.aac"))
+        model.state = .hasRecording
+        var saved = ""
+        model.edit { saved = $0 }
+        XCTAssertNil(model.attachments.recording)
+        XCTAssertEqual(model.state, .editing)
+        model.inputViewAction()(.recordAudioTap)
+        XCTAssertEqual(model.state, .editing)
+        model.inputViewAction()(.saveEdit)
+        XCTAssertEqual(saved, "Edited message")
+        XCTAssertEqual(model.state, .empty)
+    }
 }
