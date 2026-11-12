@@ -40,7 +40,7 @@
         return 0;
     NSUInteger count = [body lengthOfBytesUsingEncoding:NSUTF32LittleEndianStringEncoding] / 4;
     if(end == nil) return count;
-    if(end.length == 0 || end.length > 20 || [end rangeOfCharacterFromSet:invalid].location != NSNotFound || end.longLongValue <= 0 || end.longLongValue > count)
+    if(end.length == 0 || end.length > 20 || [end rangeOfCharacterFromSet:invalid].location != NSNotFound || end.longLongValue <= 0 || (NSUInteger)end.longLongValue > count)
         return 0;
     return (NSUInteger)end.longLongValue;
 }
