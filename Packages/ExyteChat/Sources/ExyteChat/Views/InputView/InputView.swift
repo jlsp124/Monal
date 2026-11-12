@@ -151,8 +151,7 @@ struct InputView: View {
                     inputFieldId: inputFieldId,
                     style: style,
                     availableInputs: availableInputs,
-                    localization: localization,
-                    onPasteImages: viewModel.pasteImages
+                    localization: localization
                 )
 #if targetEnvironment(macCatalyst)
                 .onChange(of: viewModel.text) { newValue in
