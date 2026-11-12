@@ -217,43 +217,30 @@ struct MessageView: View {
         }
     }
 
-    @ViewBuilder
-    func replyBubbleView(_ message: Message) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(message.user.name)
-                .fontWeight(.semibold)
-                .padding(.horizontal, MessageView.horizontalTextPadding)
-
-            if !message.attachments.isEmpty {
-                attachmentsView(message)
-                    .padding(.top, 4)
-                    .padding(.bottom, message.hasText ? 4 : 0)
-            }
-
-            if !message.files.isEmpty {
-                ForEach(message.files) { file in
-                    FileView(file: file, messageParams: params)
-                        .padding(.horizontal, 10)
-                        .padding(.top, 4)
-                }
-            }
-
-            if message.hasText {
-                MessageTextView(
-                    attributedText: message.attributedText,
-                    userType: message.user.type,
-                    params: params
-                )
-                .padding(.horizontal, MessageView.horizontalTextPadding)
-            }
-
-            if let recording = message.recording {
-                recordingView(recording)
+    func replyBubbleView(_ quoted: Message) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(quoted.user.name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(theme.colors.mainTint)
+            if quoted.hasText {
+                Text(quoted.attributedText.replyPreviewText)
+                    .font(.caption)
+                    .foregroundStyle(theme.colors.mainText)
+                    .lineLimit(3)
+            } else {
+                Label(quoted.recording != nil ? "Voice message" : "Attachment", systemImage: quoted.recording != nil ? "waveform" : "paperclip")
+                    .font(.caption)
+                    .foregroundStyle(theme.colors.mainText)
             }
         }
-        .font(.caption2)
-        .padding(.vertical, 8)
-        .bubbleBackground(message, params: params, theme: theme, isReply: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(theme.colors.messageFriendBG, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .leading) { Capsule().fill(theme.colors.mainTint).frame(width: 2).padding(.vertical, 6) }
+        .contentShape(Rectangle())
+        .onTapGesture { viewModel.scrollToReply(quoted.id) }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(Text("Show original message if loaded"))
     }
 
     @ViewBuilder

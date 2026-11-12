@@ -69,12 +69,11 @@ extension InputView {
                             .foregroundColor(theme.colors.mainTint)
                     }
 
-                    theme.images.reply.cancelReply
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                viewModel.attachments.replyMessage = nil
-                            }
-                        }
+                    Button { viewModel.attachments.replyMessage = nil } label: {
+                        theme.images.reply.cancelReply
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel(Text("Cancel reply"))
                 }
                 .padding(.horizontal, 26)
             }

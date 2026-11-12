@@ -31,6 +31,7 @@ final class ChatViewModel: ObservableObject {
     let inputFieldId = UUID()
     let messageRecordingPlayer = RecordingPlayer()
 
+    var scrollToReply: (String) -> Void = { _ in }
     var didSendMessage: (DraftMessage) -> Void = {_ in }
     var didUpdateAttachmentStatus: (AttachmentUploadUpdate) -> Void = { _ in }
     var inputViewModel: InputViewModel?

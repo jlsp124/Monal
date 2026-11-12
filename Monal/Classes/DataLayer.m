@@ -1839,6 +1839,7 @@ static NSDateFormatter* dbFormatter;
 {
     [self.db voidWriteTransaction:^{
         [self.db executeNonQuery:@"UPDATE message_history SET message=? WHERE message_history_id=?;" andArguments:@[newText, messageNo]];
+        [self.db executeNonQuery:@"UPDATE message_replies SET fallback_length=0 WHERE history_id=?;" andArguments:@[messageNo]];
     }];
 }
 
@@ -2031,6 +2032,47 @@ static NSDateFormatter* dbFormatter;
         NSArray* params = @[accountID, buddy, historyIdToUse, msgLimit];
         NSArray* results = [self.db executeScalarReader:query andArguments:params];
         return [MLMessage createMessagesFromHistoryIDs:results];
+    }];
+}
+
+-(void) setReplyForHistoryID:(NSNumber*) historyID replyId:(NSString*) replyId to:(NSString*) to fallbackLength:(NSUInteger) length
+{
+    [self.db voidWriteTransaction:^{
+        [self.db executeNonQuery:@"INSERT INTO message_replies (history_id, reply_id, reply_to, fallback_length) VALUES (?, ?, ?, ?) ON CONFLICT(history_id) DO UPDATE SET reply_id=excluded.reply_id, reply_to=excluded.reply_to, fallback_length=excluded.fallback_length;" andArguments:@[historyID, replyId, nilWrapper(to), @(length)]];
+    }];
+}
+
+-(NSDictionary*) replyForHistoryID:(NSNumber*) historyID
+{
+    return [self.db idReadTransaction:^{
+        return [self.db executeReader:@"SELECT reply_id, reply_to, fallback_length FROM message_replies WHERE history_id=?;" andArguments:@[historyID]].firstObject;
+    }];
+}
+
+-(NSDictionary*) replyForMessageId:(NSString*) messageId contact:(MLContact*) contact
+{
+    return [self.db idReadTransaction:^{
+        return [self.db executeReader:@"SELECT R.reply_id, R.reply_to, R.fallback_length FROM message_replies AS R JOIN message_history AS H ON H.message_history_id=R.history_id WHERE H.account_id=? AND H.buddy_name=? AND H.messageid=? AND H.inbound=0 ORDER BY H.message_history_id DESC LIMIT 1;" andArguments:@[contact.accountID, contact.contactJid, messageId]].firstObject;
+    }];
+}
+
+-(NSNumber*) replyTargetForMessage:(MLMessage*) message
+{
+    if(message.replyId.length == 0) return nil;
+    return [self.db idReadTransaction:^{
+        NSString* column = message.isMuc ? @"stanzaid" : @"messageid";
+        NSString* direction = @"";
+        if(!message.isMuc && message.replyTo.length > 0)
+        {
+            NSString* to = [[message.replyTo componentsSeparatedByString:@"/"] firstObject];
+            NSString* own = [self.db executeScalar:@"SELECT username || '@' || domain FROM account WHERE account_id=?;" andArguments:@[message.accountID]];
+            if(own.length > 0 && [to caseInsensitiveCompare:own] == NSOrderedSame) direction = @" AND inbound=0";
+            else if([to caseInsensitiveCompare:message.buddyName] == NSOrderedSame) direction = @" AND inbound=1";
+            else return (NSNumber*)nil;
+        }
+        NSString* query = [NSString stringWithFormat:@"SELECT message_history_id FROM message_history WHERE account_id=? AND buddy_name=? AND %@=?%@;", column, direction];
+        NSArray* ids = [self.db executeScalarReader:query andArguments:@[message.accountID, message.buddyName, message.replyId]];
+        return ids.count == 1 ? ids.firstObject : nil;
     }];
 }
 

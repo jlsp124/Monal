@@ -34,6 +34,8 @@ FOUNDATION_EXPORT NSString* const kMessageHeadlineType;
 -(void) setOobUrl:(NSString*) link;
 
 -(void) setLMCFor:(NSString*) id;
+-(void) setReplyTo:(NSString* _Nullable) to withId:(NSString*) replyId fallbackLength:(NSUInteger) length NS_SWIFT_NAME(setReply(to:id:fallbackLength:));
++(NSUInteger) replyFallbackLengthForBody:(NSString*) body inMessage:(MLXMLNode*) node NS_SWIFT_NAME(replyFallbackLength(for:in:));
 
 /**
  sets the receipt child element

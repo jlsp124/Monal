@@ -6,6 +6,14 @@ import SwiftUI
 import UIKit
 
 extension AttributedString {
+    // Message links can carry a white foreground from an outgoing bubble. Quotes use
+    // their own neutral surface; preserve links/emphasis while inheriting its text color.
+    var replyPreviewText: AttributedString {
+        var value = self
+        value.foregroundColor = nil
+        return value
+    }
+
 
     func width(withConstrainedWidth width: CGFloat, font: UIFont) -> CGFloat {
         let constraintRect = CGSize(width: width, height: .greatestFiniteMagnitude)
@@ -60,6 +68,14 @@ extension AttributedString {
 }
 
 public extension AttributedString {
+    // Message links can carry a white foreground from an outgoing bubble. Quotes use
+    // their own neutral surface; preserve links/emphasis while inheriting its text color.
+    var replyPreviewText: AttributedString {
+        var value = self
+        value.foregroundColor = nil
+        return value
+    }
+
     var urls: [URL] {
         runs[\.link].map { (link, range) in
             link?.absoluteURL

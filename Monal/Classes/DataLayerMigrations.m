@@ -3,7 +3,7 @@
 //  monalxmpp
 //
 //  Created by Friedrich Altheide on 15.01.22.
-//  Copyright © 2022 Monal.im. All rights reserved.
+//  Copyright Â© 2022 Monal.im. All rights reserved.
 //
 
 #import <monalxmpp/MLSQLite.h>
@@ -1191,6 +1191,11 @@
             else
                 DDLogInfo(@"Device id not changed: %@", current_id);
         }
+
+        // Persist reply references separately; ordinary history rows and wire bodies stay intact.
+        [self updateDB:db withDataLayer:dataLayer toVersion:7.014 withBlock:^{
+            [db executeNonQuery:@"CREATE TABLE message_replies (history_id INTEGER PRIMARY KEY, reply_id TEXT NOT NULL, reply_to TEXT, fallback_length INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(history_id) REFERENCES message_history(message_history_id) ON DELETE CASCADE);"];
+        }];
 
         //turn foreign keys on again
         //needed for sqlite >= 3.26.0 (see https://sqlite.org/lang_altertable.html point 2)

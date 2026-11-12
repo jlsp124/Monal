@@ -245,6 +245,10 @@ extern NSString* const kMessageTypeFiletransfer;
 -(NSMutableArray<MLMessage*>*) messagesForContact:(NSString*) buddy forAccount:(NSNumber*) accountID beforeMsgHistoryID:(NSNumber* _Nullable) msgHistoryID;
 -(NSMutableArray<MLMessage*>*) messagesForContact:(NSString*) buddy forAccount:(NSNumber*) accountID;
 -(NSDictionary*) messageDataForHistoryID:(NSNumber*) historyID;
+-(void) setReplyForHistoryID:(NSNumber*) historyID replyId:(NSString*) replyId to:(NSString* _Nullable) to fallbackLength:(NSUInteger) length;
+-(NSDictionary* _Nullable) replyForHistoryID:(NSNumber*) historyID;
+-(NSDictionary* _Nullable) replyForMessageId:(NSString*) messageId contact:(MLContact*) contact;
+-(NSNumber* _Nullable) replyTargetForMessage:(MLMessage*) message NS_SWIFT_NAME(replyTarget(for:));
 
 
 -(MLMessage*) lastMessageForContact:(NSString*) contact forAccount:(NSNumber*) accountID;

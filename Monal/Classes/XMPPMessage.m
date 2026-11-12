@@ -17,6 +17,35 @@
 
 @implementation XMPPMessage
 
+-(void) setReplyTo:(NSString*) to withId:(NSString*) replyId fallbackLength:(NSUInteger) length
+{
+    if(replyId.length == 0) return;
+    NSMutableDictionary* attributes = [@{@"id": replyId} mutableCopy];
+    if(to.length > 0) attributes[@"to"] = to;
+    [self addChildNode:[[MLXMLNode alloc] initWithElement:@"reply" andNamespace:@"urn:xmpp:reply:0" withAttributes:attributes andChildren:@[]]];
+    if(length > 0)
+        [self addChildNode:[[MLXMLNode alloc] initWithElement:@"fallback" andNamespace:@"urn:xmpp:fallback:0" withAttributes:@{@"for": @"urn:xmpp:reply:0"} andChildren:@[
+            [[MLXMLNode alloc] initWithElement:@"body" withAttributes:@{@"start": @"0", @"end": [@(length) stringValue]} andChildren:@[]]
+        ]]];
+}
+
++(NSUInteger) replyFallbackLengthForBody:(NSString*) body inMessage:(MLXMLNode*) node
+{
+    if(![node check:@"{urn:xmpp:reply:0}reply@id"] || ![node check:@"{urn:xmpp:fallback:0}fallback<for=urn:xmpp:reply:0>/body"])
+        return 0;
+    NSString* start = [[node findFirst:@"{urn:xmpp:fallback:0}fallback<for=urn:xmpp:reply:0>/body@start"] description];
+    NSString* end = [[node findFirst:@"{urn:xmpp:fallback:0}fallback<for=urn:xmpp:reply:0>/body@end"] description];
+    NSCharacterSet* invalid = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789"] invertedSet];
+    if(start != nil && (start.length == 0 || [start rangeOfCharacterFromSet:invalid].location != NSNotFound || start.longLongValue != 0))
+        return 0;
+    NSUInteger count = [body lengthOfBytesUsingEncoding:NSUTF32LittleEndianStringEncoding] / 4;
+    if(end == nil) return count;
+    if(end.length == 0 || end.length > 20 || [end rangeOfCharacterFromSet:invalid].location != NSNotFound || end.longLongValue <= 0 || end.longLongValue > count)
+        return 0;
+    return (NSUInteger)end.longLongValue;
+}
+
+
 NSString* const kMessageChatType = @"chat";
 NSString* const kMessageGroupChatType = @"groupchat";
 NSString* const kMessageErrorType = @"error";

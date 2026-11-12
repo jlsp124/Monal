@@ -3,7 +3,7 @@
 //  Monal
 //
 //  Created by Friedrich Altheide on 08.07.20.
-//  Copyright © 2020 Monal.im. All rights reserved.
+//  Copyright Â© 2020 Monal.im. All rights reserved.
 //
 
 #include <stdio.h>
@@ -2736,6 +2736,8 @@ NSString* MLResolveAppGroup(NSString* original, id metadata, NSURL* (^lookup)(NS
             @"urn:xmpp:message-retract:1",
             @"urn:xmpp:message-correct:0",
             @"urn:xmpp:reactions:0",
+            @"urn:xmpp:reply:0",
+            @"urn:xmpp:fallback:0",
             @"urn:xmpp:fallback:0",
         ] mutableCopy];
         if([[HelperTools defaultsDB] boolForKey: @"SendLastUserInteraction"])

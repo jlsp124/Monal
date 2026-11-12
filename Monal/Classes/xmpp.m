@@ -4104,6 +4104,10 @@ static NSRegularExpression* fastTokenRemovalRegex;
             [messageNode setBody:message];
     }
     
+    NSDictionary* reply = [[DataLayer sharedInstance] replyForMessageId:(LMCId ?: messageId) contact:contact];
+    if(reply != nil)
+        [messageNode setReplyTo:nilExtractor(reply[@"reply_to"]) withId:reply[@"reply_id"] fallbackLength:(LMCId ? 0 : [reply[@"fallback_length"] unsignedIntegerValue])];
+
     //set message type
     if(contact.isMuc)
         [messageNode.attributes setObject:kMessageGroupChatType forKey:@"type"];
@@ -4846,7 +4850,7 @@ static NSRegularExpression* fastTokenRemovalRegex;
         [self queryServerVersion];
         [self purgeOfflineStorage];
         [self setMAMPrefs:@"always"];   //make sure we are able to do proper catchups
-        [self sendPresence];            //this will trigger a replay of offline stanzas on prosody (no XEP-0013 support anymore 😡)
+        [self sendPresence];            //this will trigger a replay of offline stanzas on prosody (no XEP-0013 support anymore ðŸ˜¡)
         //the offline messages will come in *after* we initialized the mam query, because the disco result comes in first
         //(and this is what triggers mam catchup)
         //--> no holes in our history can be caused by these offline messages in conjunction with mam catchup,

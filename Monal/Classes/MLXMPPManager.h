@@ -110,6 +110,7 @@ NS_ASSUME_NONNULL_BEGIN
  It returns an MLMessage object (corresponding to the sent message) on success, and nil on failure.
  */
 -(MLMessage* _Nullable) sendMessageAndAddToHistory:(NSString*) message havingType:(NSString*) messageType toContact:(MLContact*) contact isEncrypted:(BOOL) encrypted uploadInfo:(NSDictionary* _Nullable) uploadInfo NS_SWIFT_NAME(sendMessageAndAddToHistory(message:havingType:toContact:isEncrypted:uploadInfo:));
+-(MLMessage* _Nullable) sendMessageAndAddToHistory:(NSString*) message havingType:(NSString*) messageType toContact:(MLContact*) contact isEncrypted:(BOOL) encrypted uploadInfo:(NSDictionary* _Nullable) uploadInfo replyToMessage:(MLMessage* _Nullable) replyToMessage NS_SWIFT_NAME(sendMessageAndAddToHistory(message:havingType:toContact:isEncrypted:uploadInfo:replyToMessage:));
 -(void)sendMessage:(NSString*) message toContact:(MLContact*) contact isEncrypted:(BOOL) encrypted isUpload:(BOOL) isUpload messageId:(NSString*) messageId withCompletionHandler:(void (^ _Nullable)(BOOL success, NSString* messageId)) completion;
 -(void) sendChatState:(BOOL) isTyping toContact:(MLContact*) contact;
 

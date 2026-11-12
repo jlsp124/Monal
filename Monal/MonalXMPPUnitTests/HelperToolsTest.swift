@@ -11,6 +11,30 @@ import monalxmpp
 
 struct HelperToolsTest {
 
+    @Test("Reply fallback offsets round trip as Unicode scalar counts")
+    func replyFallbackUnicode() {
+        let stanza = XMPPMessage()
+        let quote = "> 👨‍👩‍👧‍👦\n"
+        let count = quote.unicodeScalars.count
+        stanza.setReply(to: "alice@example.org", id: "original-id", fallbackLength: UInt(count))
+        #expect(XMPPMessage.replyFallbackLength(for: quote + "Answer", in: stanza) == UInt(count))
+    }
+
+    @Test("Invalid fallback ranges never remove message content")
+    func replyFallbackBounds() {
+        let stanza = XMPPMessage()
+        stanza.setReply(to: nil, id: "original-id", fallbackLength: 999)
+        #expect(XMPPMessage.replyFallbackLength(for: "Short body", in: stanza) == 0)
+        #expect(XMPPMessage.replyFallbackLength(for: "Body", in: XMPPMessage()) == 0)
+    }
+
+    @Test("Attachment replies keep their URL body intact")
+    func replyWithoutTextFallback() {
+        let stanza = XMPPMessage()
+        stanza.setReply(to: nil, id: "room-stanza-id", fallbackLength: 0)
+        #expect(XMPPMessage.replyFallbackLength(for: "https://example.org/file.jpg", in: stanza) == 0)
+    }
+
     @Test("Original App Group is preferred when accessible")
     func originalAppGroup() {
         let result = MLResolveAppGroup("group.monalalpha", ["group.monalalpha.TEAM"], { _ in URL(fileURLWithPath: "/shared") })

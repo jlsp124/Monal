@@ -719,6 +719,29 @@ static const int pingFreqencyMinutes = 5;       //about the same Conversations u
 #pragma mark -  XMPP commands
 -(MLMessage*) sendMessageAndAddToHistory:(NSString*) message havingType:(NSString*) messageType toContact:(MLContact*) contact isEncrypted:(BOOL) encrypted uploadInfo:(NSDictionary* _Nullable) uploadInfo
 {
+    return [self sendMessageAndAddToHistory:message havingType:messageType toContact:contact isEncrypted:encrypted uploadInfo:uploadInfo replyToMessage:nil];
+}
+
+-(MLMessage*) sendMessageAndAddToHistory:(NSString*) message havingType:(NSString*) messageType toContact:(MLContact*) contact isEncrypted:(BOOL) encrypted uploadInfo:(NSDictionary* _Nullable) uploadInfo replyToMessage:(MLMessage*) replyToMessage
+{
+    NSString* replyId = nil;
+    NSString* replyTo = nil;
+    NSUInteger fallbackLength = 0;
+    if(replyToMessage != nil && !replyToMessage.deletedLocally && [replyToMessage isEqualToContact:contact])
+    {
+        replyId = replyToMessage.isMuc ? replyToMessage.stanzaId : replyToMessage.messageId;
+        replyTo = replyToMessage.isMuc ? nil : (replyToMessage.inbound ? contact.contactJid : contact.account.connectionProperties.identity.jid);
+        // Keep upload URLs and geo: bodies intact for non-reply clients and content detection.
+        if(replyId.length > 0 && [messageType isEqualToString:kMessageTypeText])
+        {
+            NSString* summary = [replyToMessage.messageType isEqualToString:kMessageTypeText] ? replyToMessage.messageText : NSLocalizedString(@"Attachment", @"");
+            if(summary.length > 500) summary = [summary substringToIndex:[summary rangeOfComposedCharacterSequencesForRange:NSMakeRange(0, 500)].length];
+            NSString* quote = [NSString stringWithFormat:@"> %@\n", [summary stringByReplacingOccurrencesOfString:@"\n" withString:@"\n> "]];
+            fallbackLength = [quote lengthOfBytesUsingEncoding:NSUTF32LittleEndianStringEncoding] / 4;
+            message = [quote stringByAppendingString:message];
+        }
+    }
+
     NSString* msgid = [[NSUUID UUID] UUIDString];
     xmpp* account = contact.account;
 
@@ -752,6 +775,9 @@ static const int pingFreqencyMinutes = 5;       //about the same Conversations u
     if(messageDBId != nil)
     {
         DDLogVerbose(@"Message added to history with id %ld", (long)[messageDBId intValue]);
+
+        if(replyId.length > 0)
+            [[DataLayer sharedInstance] setReplyForHistoryID:messageDBId replyId:replyId to:replyTo fallbackLength:fallbackLength];
 
         // MLMessage object that will be returned by the method
         MLMessage* newMLMessage = [MLMessage createMessageFromHistoryID:messageDBId];

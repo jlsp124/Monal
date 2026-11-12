@@ -75,6 +75,9 @@ The of the message in the DB , should be int
 @property (nonatomic, readonly) MLFiletransferInfo* fileInfo;
 
 @property (nonatomic, copy) NSString* messageText;
+@property (nonatomic, copy) NSString* _Nullable replyId;
+@property (nonatomic, copy) NSString* _Nullable replyTo;
+@property (nonatomic, assign) NSUInteger replyFallbackLength;
 
 @property (nonatomic, copy) NSArray<MLReactionsEntry*>* reactions;
 

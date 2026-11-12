@@ -357,6 +357,9 @@ public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction:
             }
         )
         .onAppear {
+            viewModel.scrollToReply = { id in
+                self.pendingScrollTo = ScrollToParams(messageID: id, position: .middle)
+            }
             viewModel.didSendMessage = didSendMessage
             viewModel.inputViewModel = inputViewModel
             viewModel.globalFocusState = globalFocusState

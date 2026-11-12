@@ -191,12 +191,12 @@ struct ChatView: View {
             if case .error = message.status {
                 return [.resend, .delete]
             }
-            var availableActions: [MessageAction] = [.reply]
+            var availableActions: [MessageAction] = !mlMessage.isMuc || mlMessage.stanzaId != nil ? [.reply] : []
             if message.hasText {
                 availableActions.append(.copy)
             }
 
-            if !mlMessage.inbound && DataLayer.sharedInstance().checkLMCEligible(mlMessage.messageDBId, encrypted: mlMessage.encrypted || contact.isEncrypted, historyBaseID: nil) {
+            if !mlMessage.inbound && mlMessage.replyId == nil && DataLayer.sharedInstance().checkLMCEligible(mlMessage.messageDBId, encrypted: mlMessage.encrypted || contact.isEncrypted, historyBaseID: nil) {
                 availableActions.append(.edit)
             }
 
@@ -456,7 +456,7 @@ struct ChatView: View {
         scrollToMessage = ScrollToParams(messageID: chatMessage.id, position: .bottom)
     }
 
-    private func uploadAndSendFile(_ localFileURL: URL?, useMediaCompression: Bool = false) async {
+    private func uploadAndSendFile(_ localFileURL: URL?, useMediaCompression: Bool = false, replyTo: MLMessage? = nil) async {
         guard let localFileURL = localFileURL else {
             DDLogError("Couldn't get file location in order to upload it!")
             return
@@ -475,7 +475,7 @@ struct ChatView: View {
             }
             localFileURL.stopAccessingSecurityScopedResource()
             await MainActor.run {
-                guard let newMLMessage = MLXMPPManager.sharedInstance().sendMessageAndAddToHistory(message: url, havingType: kMessageTypeFiletransfer, toContact: self.contact.obj, isEncrypted: self.contact.isEncrypted, uploadInfo: ["mimeType": mimeType, "size": size]) else {
+                guard let newMLMessage = MLXMPPManager.sharedInstance().sendMessageAndAddToHistory(message: url, havingType: kMessageTypeFiletransfer, toContact: self.contact.obj, isEncrypted: self.contact.isEncrypted, uploadInfo: ["mimeType": mimeType, "size": size], replyToMessage: replyTo) else {
                     self.isUploadingFile = false
                     return
                 }
@@ -500,7 +500,8 @@ struct ChatView: View {
             if chatViewDefaultsDB.chatHapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
             action(message, .reply)
         }, activeFor: { message in
-            !(message as! ChatViewMessage).innerMessage.retracted
+            let target = (message as! ChatViewMessage).innerMessage.obj
+            return !target.retracted && (!target.isMuc || target.stanzaId != nil)
         }, background: .accentColor) {
             Label("Reply", systemImage: "arrowshape.turn.up.left")
                 .foregroundStyle(.white)
@@ -510,23 +511,24 @@ struct ChatView: View {
 
     var body: some View {
         ExyteChatView(messages: messages, chatType: .conversation, replyMode: .quote) { draft in
+            let replyTo = messages.first(where: { $0.id == draft.replyMessage?.id })?.innerMessage.obj
             if !draft.medias.isEmpty || draft.recording != nil || !draft.files.isEmpty {
                 Task {
                     if draft.recording != nil {
-                        await uploadAndSendFile(draft.recording!.url)
+                        await uploadAndSendFile(draft.recording!.url, replyTo: replyTo)
                     }
                     for media in draft.medias {
                         let localFileURL = await media.getURL()
-                        await uploadAndSendFile(localFileURL, useMediaCompression: true)
+                        await uploadAndSendFile(localFileURL, useMediaCompression: true, replyTo: replyTo)
                     }
                     for file in draft.files {
                         // We don't want to compress media selected using the file picker
-                        await uploadAndSendFile(file.localURL, useMediaCompression: false)
+                        await uploadAndSendFile(file.localURL, useMediaCompression: false, replyTo: replyTo)
                     }
                 }
             }
             if !draft.text.isEmpty {
-                guard let newMLMessage = MLXMPPManager.sharedInstance().sendMessageAndAddToHistory(message: draft.text, havingType: kMessageTypeText, toContact: self.contact.obj, isEncrypted: self.contact.isEncrypted, uploadInfo: nil) else {
+                guard let newMLMessage = MLXMPPManager.sharedInstance().sendMessageAndAddToHistory(message: draft.text, havingType: kMessageTypeText, toContact: self.contact.obj, isEncrypted: self.contact.isEncrypted, uploadInfo: nil, replyToMessage: replyTo) else {
                     return
                 }
                 appendOutgoingMessage(newMLMessage)
@@ -538,7 +540,7 @@ struct ChatView: View {
             }
             if let location = draft.staticLocation {
                 let messageText = "geo:\(location.latitude),\(location.longitude)"
-                guard let newMLMessage = MLXMPPManager.sharedInstance().sendMessageAndAddToHistory(message: messageText, havingType: kMessageTypeGeo, toContact: self.contact.obj, isEncrypted: self.contact.isEncrypted, uploadInfo: nil) else {
+                guard let newMLMessage = MLXMPPManager.sharedInstance().sendMessageAndAddToHistory(message: messageText, havingType: kMessageTypeGeo, toContact: self.contact.obj, isEncrypted: self.contact.isEncrypted, uploadInfo: nil, replyToMessage: replyTo) else {
                     return
                 }
                 appendOutgoingMessage(newMLMessage)
@@ -1062,7 +1064,34 @@ class ChatViewMessage: ExyteChat.Message {
         } else if innerMessage.messageType == kMessageTypeFiletransfer && fileInfo != nil {
             return ""
         }
-        return innerMessage.retracted ? NSLocalizedString("This message got retracted", comment: "") : innerMessage.messageText
+        if innerMessage.retracted { return NSLocalizedString("This message got retracted", comment: "") }
+        let body = innerMessage.messageText
+        let length = Int(innerMessage.replyFallbackLength)
+        if replyMessage != nil, length > 0, length <= body.unicodeScalars.count {
+            return String(String.UnicodeScalarView(body.unicodeScalars.dropFirst(length)))
+        }
+        return body
+    }
+    override var replyMessage: ReplyMessage? {
+        get {
+            guard let targetID = DataLayer.sharedInstance().replyTarget(for: innerMessage.obj),
+                  targetID != innerMessage.obj.messageDBId else { return nil }
+            let target = MLMessage.createMessage(fromHistoryID: targetID)
+            guard !target.deletedLocally else { return nil }
+            let summary: String
+            if target.retracted {
+                summary = NSLocalizedString("This message got retracted", comment: "")
+            } else if target.messageType == kMessageTypeFiletransfer {
+                summary = NSLocalizedString("Attachment", comment: "")
+            } else if target.messageType == kMessageTypeGeo {
+                summary = NSLocalizedString("Location", comment: "")
+            } else {
+                // Never recursively construct a reply: malformed references may form cycles.
+                summary = String(target.messageText.prefix(500))
+            }
+            return ReplyMessage(id: target.id, user: ChatViewUser(target.contact as! NSObject&MLContactProtocol), createdAt: target.timestamp, text: summary)
+        }
+        set {}
     }
     override var hasText: Bool {
         return !text.isEmpty

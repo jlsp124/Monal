@@ -3,7 +3,7 @@
 //  Monal
 //
 //  Created by Anurodh Pokharel on 11/27/19.
-//  Copyright © 2019 Monal.im. All rights reserved.
+//  Copyright Ã‚Â© 2019 Monal.im. All rights reserved.
 //
 
 #import <monalxmpp/MLMessage.h>
@@ -83,6 +83,10 @@ static NSMutableDictionary* _singletonCache;
     message.messageId = [dic objectForKey:@"messageid"];
     message.stanzaId = [dic objectForKey:@"stanzaid"];
     message.messageDBId = [dic objectForKey:@"message_history_id"];
+    NSDictionary* reply = [[DataLayer sharedInstance] replyForHistoryID:historyID];
+    message.replyId = reply[@"reply_id"];
+    message.replyTo = nilExtractor(reply[@"reply_to"]);
+    message.replyFallbackLength = [reply[@"fallback_length"] unsignedIntegerValue];
     message.timestamp = [dic objectForKey:@"thetime"];
     message.messageType = [dic objectForKey:@"messageType"];
     message.participantJid = [dic objectForKey:@"participant_jid"];
@@ -212,6 +216,7 @@ static NSMutableDictionary* _singletonCache;
         NSString* correctedText = data[@"correctedText"];
         MLAssert(correctedText != nil, @"Message correction notification without the corrected text");
         self.messageText = correctedText;
+        self.replyFallbackLength = [[[DataLayer sharedInstance] replyForHistoryID:self.messageDBId][@"fallback_length"] unsignedIntegerValue];
     }
 
     if(reactionsUpdate.boolValue)

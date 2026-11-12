@@ -694,7 +694,9 @@ static NSMutableDictionary* _typingNotifications;
             body = decrypted;
             encrypted = YES;
         }
-        body = [body stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        // XEP-0428 offsets count the original body's Unicode scalar values.
+        if(![messageNode check:@"{urn:xmpp:reply:0}reply@id"])
+            body = [body stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         
         //messages with oob tag are filetransfers (but only if they are https urls)
         NSString* lowercaseBody = [body lowercaseString];
@@ -770,8 +772,19 @@ static NSMutableDictionary* _typingNotifications;
                 ];
             }
             
+            NSString* replyId = [messageNode findFirst:@"{urn:xmpp:reply:0}reply@id"];
+            if(historyId != nil && replyId.length > 0)
+                [[DataLayer sharedInstance] setReplyForHistoryID:historyId replyId:replyId to:[messageNode findFirst:@"{urn:xmpp:reply:0}reply@to"] fallbackLength:[XMPPMessage replyFallbackLengthForBody:body inMessage:messageNode]];
             if(historyId != nil)
+            {
                 message = [MLMessage createMessageFromHistoryID:historyId];
+                if(replyId.length > 0)
+                {
+                    message.replyId = replyId;
+                    message.replyTo = [messageNode findFirst:@"{urn:xmpp:reply:0}reply@to"];
+                    message.replyFallbackLength = [XMPPMessage replyFallbackLengthForBody:body inMessage:messageNode];
+                }
+            }
             if(message != nil && historyId != nil)      //check historyId to make static analyzer happy
             {
                 DDLogVerbose(@"Added or LMC-replaced message in history db: %@", message);

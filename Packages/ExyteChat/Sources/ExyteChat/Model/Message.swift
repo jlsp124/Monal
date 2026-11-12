@@ -281,7 +281,7 @@ public class ReplyMessage: ObservableObject, Codable, Identifiable {
         self.id = id
         self.user = user
         self.createdAt = createdAt
-        self.attributedText = attributedText
+        self.attributedText = attributedText.replyPreviewText
         self.attachments = attachments
         self.files = files
         self.recording = recording
@@ -292,7 +292,7 @@ public class ReplyMessage: ObservableObject, Codable, Identifiable {
         id = try container.decode(String.self, forKey: .id)
         user = try container.decode(User.self, forKey: .user)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
-        attributedText = try container.decode(AttributedString.self, forKey: .attributedText)
+        attributedText = try container.decode(AttributedString.self, forKey: .attributedText).replyPreviewText
         attachments = try container.decode([Attachment].self, forKey: .attachments)
         files = try container.decode([File].self, forKey: .files)
         recording = try container.decode(Recording?.self, forKey: .recording)
