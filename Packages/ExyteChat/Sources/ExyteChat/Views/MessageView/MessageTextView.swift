@@ -28,6 +28,7 @@ struct MessageTextView: View {
             VStack(alignment: .leading) {
                 Text(attributedText)
                     .foregroundStyle(theme.colors.messageText(userType))
+                    .font(String(attributedText.characters).isShortEmojiMessage ? .largeTitle : Font(params.font as CTFont))
 
                 if !previewLinks.isEmpty {
                     VStack(alignment: userType == .current ? .trailing : .leading) {
