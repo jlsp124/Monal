@@ -19,6 +19,7 @@ struct ChatCustomizationParameters {
     var showShareAttachmentButton: Bool = true
     var showLastReadIndicator: Bool = false
     var keyboardDismissMode: UIScrollView.KeyboardDismissMode = .none
+    var automaticallyScrollOnSend = true
     var messageMenuAnimationDuration: CGFloat = 0.3
     var contentInsets: UIEdgeInsets = .zero
 

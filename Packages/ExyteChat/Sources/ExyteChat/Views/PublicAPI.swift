@@ -137,6 +137,14 @@ public extension ChatView {
         return view
     }
 
+    /// Disable when the host inserts outgoing messages asynchronously and supplies
+    /// an explicit scroll target after persistence/upload completes.
+    func automaticallyScrollOnSend(_ enabled: Bool) -> ChatView {
+        var view = self
+        view.chatCustomizationParameters.automaticallyScrollOnSend = enabled
+        return view
+    }
+
     /// receive scrolling offset updates
     func onContentOffsetChange(_ closure: @escaping (CGFloat) -> Void) -> ChatView {
         var view = self

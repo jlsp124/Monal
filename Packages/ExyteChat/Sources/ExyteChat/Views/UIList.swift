@@ -48,7 +48,8 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UITableView {
         let style = mainHeaderBuilder != nil || chatParams.showDateHeaders ? UITableView.Style.grouped : .plain
-        let tableView = UITableView(frame: .zero, style: style)
+        let tableView = ChatTableView(frame: .zero, style: style)
+        tableView.isInvertedConversation = type == .conversation
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.separatorStyle = .none
         tableView.dataSource = context.coordinator
@@ -136,7 +137,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
                         performScrollTo(tableView, scrollToParams: scrollToParams)
                     }
 
-                    if animationMode == .natural {
+                    if animationMode == .natural, !UIAccessibility.isReduceMotionEnabled {
                         await withCheckedContinuation { continuation in
                             UIView.animate(withDuration: 0.25) {
                                 perform()
@@ -168,7 +169,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
         case .tableOffset(let offset):
             tableView.setContentOffset(CGPoint(x: 0, y: offset), animated: false)
         case .newestMessage:
-            tableView.setContentOffset(CGPoint(x: 0, y: 0), animated: false)
+            tableView.setContentOffset(CGPoint(x: 0, y: -tableView.adjustedContentInset.top), animated: false)
         case .oldestMessage:
             // An empty table has no section 0 to ask about: clamping the index
             // to 0 makes numberOfRows(inSection:) raise
@@ -250,7 +251,10 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
         // Skip the indicator row — it has no backing message to preserve by ID
         let visibleIndexPaths = tableView.indexPathsForVisibleRows ?? []
         guard let firstVisibleIndexPath = visibleIndexPaths.first(where: { $0 != oldIndicatorIP }),
-              let preservedVisibleRect = tableView.rectForRow(at: firstVisibleIndexPath) as CGRect? else { return }
+              let preservedVisibleRect = tableView.rectForRow(at: firstVisibleIndexPath) as CGRect? else {
+            updateTableNoAnimation(tableView, coordinator)
+            return
+        }
 
         let dataRow = adjustedDataRow(firstVisibleIndexPath.row, section: firstVisibleIndexPath.section, indicator: oldIndicatorIP)
         let firstVisibleRow = coordinator.sections[firstVisibleIndexPath.section].rows[dataRow]
@@ -259,7 +263,9 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
 
         coordinator.sections = sections
 
+        CATransaction.begin()
         CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
 
         tableView.reloadData()
         tableView.layoutIfNeeded()
@@ -353,7 +359,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
         let insertIndicatorIP = UIList.lastReadIndicatorIndexPath(sections: sections, enabled: chatParams.showLastReadIndicator)
         updateContextClosure(sections)
 
-        let animated = isScrolledToBottom || isScrolledToTop
+        let animated = (isScrolledToBottom || isScrolledToTop) && !UIAccessibility.isReduceMotionEnabled
         await performBatchTableUpdates(tableView) {
             for operation in splitInfo.insertOperations {
                 applyOperation(operation, tableView: tableView, animateInserts: animated, indicatorIndexPath: insertIndicatorIP)
@@ -454,6 +460,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
             inputViewModel: inputViewModel,
             isScrolledToBottom: $isScrolledToBottom,
             isScrolledToTop: $isScrolledToTop,
+            pendingScrollTo: $pendingScrollTo,
 
             messageBuilder: messageBuilder,
             mainHeaderBuilder: mainHeaderBuilder,
@@ -476,6 +483,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
 
         @Binding var isScrolledToBottom: Bool
         @Binding var isScrolledToTop: Bool
+        @Binding var pendingScrollTo: ScrollToParams?
 
         // MARK: - View builders
 
@@ -521,6 +529,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
             inputViewModel: InputViewModel,
             isScrolledToBottom: Binding<Bool>,
             isScrolledToTop: Binding<Bool>,
+            pendingScrollTo: Binding<ScrollToParams?>,
 
             messageBuilder: @escaping MessageBuilderParamsClosure,
             mainHeaderBuilder: (() -> AnyView)?,
@@ -538,6 +547,7 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
             self.inputViewModel = inputViewModel
             self._isScrolledToBottom = isScrolledToBottom
             self._isScrolledToTop = isScrolledToTop
+            self._pendingScrollTo = pendingScrollTo
 
             self.messageBuilder = messageBuilder
             self.mainHeaderBuilder = mainHeaderBuilder
@@ -773,6 +783,11 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
             ca.backgroundColor = UIColor(bgColor)
 
             return ca
+        }
+
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            // A gesture takes precedence over a queued programmatic reveal.
+            pendingScrollTo = nil
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {

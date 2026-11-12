@@ -287,11 +287,12 @@ public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction:
                         self.pendingScrollTo = ScrollToParams(.newestMessage) // Cannot assign to property: 'self' is immutable
                     } label: {
                         theme.images.scrollToBottom
-                            .viewSize(40)
+                            .viewSize(44)
                             .circleBackground(theme.colors.messageFriendBG)
                             .foregroundStyle(theme.colors.sendButtonBackground)
                             .shadow(color: .primary.opacity(0.1), radius: 2, y: 1)
                     }
+                    .accessibilityLabel(Text("Latest messages"))
                     .padding(.trailing, MessageView.horizontalScreenEdgePadding)
                     .padding(.bottom, 8)
                 }
@@ -374,10 +375,8 @@ public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction:
                 if let id = value.id, let liveLocation = value.liveLocation {
                     viewModel.startLiveLocationSharing(messageId: id, liveLocation: liveLocation)
                 }
-                if type == .conversation {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        self.pendingScrollTo = ScrollToParams(.newestMessage)
-                    }
+                if type == .conversation, chatCustomizationParameters.automaticallyScrollOnSend {
+                    self.pendingScrollTo = ScrollToParams(.newestMessage)
                 }
             }
         }

@@ -664,6 +664,7 @@ struct ChatView: View {
         }
         .linkPreviewsEnabled(chatViewDefaultsDB.showURLPreview)
         .inputViewText($inputText)
+        .automaticallyScrollOnSend(false)
         .scrollTo(scrollToMessage)
         .checkFileSizeClosure { file in
             MLFiletransfer.checkMimeTypeAndSize(forHistoryID: Int(file.id)! as NSNumber)
@@ -1006,6 +1007,10 @@ struct ChatView: View {
                 unreachable("Notification without contact")
             }
             if contact.isEqual(self.contact.obj) {
+                messageInsertionTimer?.invalidate()
+                messageInsertionTimer = nil
+                queuedNewMessages.removeAll()
+                scrollToMessage = nil
                 self.messages = []
             }
         }
