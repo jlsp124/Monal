@@ -9,6 +9,7 @@ import SwiftUI
 
 struct RecordIndicator: View {
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let count = 2
 
     var body: some View {
@@ -16,8 +17,12 @@ struct RecordIndicator: View {
             .linear(duration: 1)
             .repeatForever(autoreverses: false)
 
-        ForEach(0..<count, id: \.self) { index in
-            GrowingCircleIndicatorView(animation: animation.delay(CGFloat(index) * 0.5))
+        if reduceMotion {
+            Circle()
+        } else {
+            ForEach(0..<count, id: \.self) { index in
+                GrowingCircleIndicatorView(animation: animation.delay(CGFloat(index) * 0.5))
+            }
         }
     }
 }

@@ -462,6 +462,13 @@ struct ChatView: View {
             DDLogError("Couldn't get file location in order to upload it!")
             return
         }
+        defer {
+            let temporaryDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true).standardizedFileURL
+            if localFileURL.deletingLastPathComponent().standardizedFileURL == temporaryDirectory,
+               localFileURL.lastPathComponent.hasPrefix("Pasted-") {
+                try? FileManager.default.removeItem(at: localFileURL)
+            }
+        }
         self.isUploadingFile = true
         do {
             localFileURL.startAccessingSecurityScopedResource()
@@ -620,7 +627,6 @@ struct ChatView: View {
                                     Text("Retry"),
                                     action: {
                                         Task { @MainActor in
-                                            let messageId = mlMessage.messageId
                                             await Task.detached(priority: .userInitiated) {
                                                 DataLayer.sharedInstance().prepareMessage(forRetry: mlMessage.messageDBId)
                                             }.value
@@ -803,22 +809,24 @@ struct ChatView: View {
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 35, height: 35)
+                                    .clipShape(Circle())
 
-                                VStack(alignment: .leading, spacing: 0) {
+                                VStack(alignment: .leading, spacing: 2) {
                                     Text(contact.contactDisplayName as String)
                                         .fontWeight(.semibold)
                                         .font(.headline)
+                                        .lineLimit(1)
                                         .foregroundColor(.primary)
                                     
                                     if (contact.isTyping as Bool) {
                                         Text("Typing...")
                                             .font(.footnote)
-                                            .foregroundColor(Color(hex: "AFB3B8"))
+                                            .foregroundColor(.secondary)
                                     } else if let lastInteractionDate:Date = contact.lastInteractionTime {
                                         TimelineView(.periodic(from: lastInteractionDate, by: 60.0)) { _ in
                                             Text(HelperTools.formatLastInteraction(contact.lastInteractionTime))
                                                 .font(.footnote)
-                                                .foregroundColor(Color(hex: "AFB3B8"))
+                                                .foregroundColor(.secondary)
                                         }
                                     }
                                 }

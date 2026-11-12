@@ -11,6 +11,7 @@ import AnchoredPopup
 
 struct InputView: View {
 
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.chatTheme) var theme
     @Environment(\.mediaPickerTheme) var pickerTheme
     @Environment(\.chatSize) var chatSize

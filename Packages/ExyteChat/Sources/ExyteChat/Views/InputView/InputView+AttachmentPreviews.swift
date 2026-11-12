@@ -85,7 +85,7 @@ extension InputView {
         horizontalAttachmentsPreviewScroll {
             ForEach(viewModel.attachments.medias) { media in
                 MediaAttachmentThumbnail(media: media) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                         viewModel.attachments.medias.removeAll { $0.id == media.id }
                     }
                 }
@@ -117,7 +117,7 @@ extension InputView {
             Spacer()
 
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                     viewModel.attachments.staticLocation = nil
                 }
             } label: {
@@ -145,7 +145,7 @@ extension InputView {
             Spacer()
 
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                     viewModel.attachments.liveLocation = nil
                 }
             } label: {

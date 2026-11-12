@@ -21,6 +21,7 @@ final actor Recorder: AudioRecording {
     typealias ProgressHandler = @Sendable (Double, [CGFloat]) -> Void
 
     private let audioSession = AVAudioSession()
+    private var ownsAudioSession = false
     private var audioRecorder: AVAudioRecorder?
     private var recordingTask: Task<Void, Never>?
 
@@ -71,6 +72,7 @@ final actor Recorder: AudioRecording {
             try audioSession.setCategory(.playAndRecord, mode: .voiceChat)
             try audioSession.overrideOutputAudioPort(.speaker)
             try audioSession.setActive(true)
+            ownsAudioSession = true
             audioRecorder = try AVAudioRecorder(url: recordingUrl, settings: settings)
             audioRecorder?.isMeteringEnabled = true
             guard audioRecorder?.record() == true else {
@@ -90,6 +92,7 @@ final actor Recorder: AudioRecording {
 
             return recordingUrl
         } catch {
+            try? FileManager.default.removeItem(at: recordingUrl)
             cancelRecording()
             return nil
         }
@@ -101,6 +104,7 @@ final actor Recorder: AudioRecording {
             // power from 0 db (max) to -60 db (roughly min)
             let adjustedPower = 1 - (max(power, -60) / 60 * -1)
             soundSamples.append(CGFloat(adjustedPower))
+            if soundSamples.count > 600 { soundSamples.removeFirst(soundSamples.count - 600) }
         }
         if let time = audioRecorder?.currentTime {
             durationProgressHandler(time, soundSamples)
@@ -109,13 +113,13 @@ final actor Recorder: AudioRecording {
 
     func stopRecording() {
         generation = UUID()
-        let wasRecording = audioRecorder != nil
         audioRecorder?.stop()
         audioRecorder = nil
         recordingTask?.cancel()
         recordingTask = nil
-        if wasRecording {
+        if ownsAudioSession {
             try? audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+            ownsAudioSession = false
         }
     }
 

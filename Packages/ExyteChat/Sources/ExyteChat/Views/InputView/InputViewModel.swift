@@ -40,6 +40,8 @@ final class InputViewModel: ObservableObject {
         self.recorder = recorder
     }
 
+    deinit { for url in pastedImageURLs { try? FileManager.default.removeItem(at: url) } }
+
     private var saveEditingClosure: ((String) -> Void)?
 
     private var recordPlayerSubscription: AnyCancellable?
@@ -182,7 +184,9 @@ final class InputViewModel: ObservableObject {
         unsubscribeRecordPlayer()
         attachments.recording = nil
         state = text.isEmpty && attachments.medias.isEmpty && attachments.files.isEmpty && attachments.staticLocation == nil && attachments.liveLocation == nil ? .empty : .hasTextOrMedia
+        let priorCleanup = recordingCleanupTask
         recordingCleanupTask = Task {
+            await priorCleanup?.value
             await recorder.cancelRecording()
             await recordingPlayer?.reset()
             if let discardedURL { try? FileManager.default.removeItem(at: discardedURL) }

@@ -433,22 +433,23 @@ struct UIList<MessageContent: View>: UIViewRepresentable {
             return row + 1
         }
 
+        let rowAnimation: UITableView.RowAnimation = UIAccessibility.isReduceMotionEnabled ? .none : .top
         switch operation {
         case .deleteSection(let section):
-            tableView.deleteSections([section], with: .automatic)
+            tableView.deleteSections([section], with: UIAccessibility.isReduceMotionEnabled ? .none : .automatic)
         case .insertSection(let section):
-            tableView.insertSections([section], with: .top)
+            tableView.insertSections([section], with: rowAnimation)
         case .delete(let section, let row):
-            tableView.deleteRows(at: [IndexPath(row: tableRow(section, row), section: section)], with: .top)
+            tableView.deleteRows(at: [IndexPath(row: tableRow(section, row), section: section)], with: rowAnimation)
         case .insert(let section, let row):
-            tableView.insertRows(at: [IndexPath(row: tableRow(section, row), section: section)], with: animateInserts ? .top : .none)
+            tableView.insertRows(at: [IndexPath(row: tableRow(section, row), section: section)], with: animateInserts ? rowAnimation : .none)
         case .swap(let section, let rowFrom, let rowTo):
-            tableView.deleteRows(at: [IndexPath(row: tableRow(section, rowFrom), section: section)], with: .top)
-            tableView.insertRows(at: [IndexPath(row: tableRow(section, rowTo), section: section)], with: .top)
+            tableView.deleteRows(at: [IndexPath(row: tableRow(section, rowFrom), section: section)], with: rowAnimation)
+            tableView.insertRows(at: [IndexPath(row: tableRow(section, rowTo), section: section)], with: rowAnimation)
         case .edit(let section, let row):
             tableView.reconfigureRows(at: [IndexPath(row: tableRow(section, row), section: section)])
         case .editChangingHeight(let section, let row):
-            tableView.reloadRows(at: [IndexPath(row: tableRow(section, row), section: section)], with: .automatic)
+            tableView.reloadRows(at: [IndexPath(row: tableRow(section, row), section: section)], with: UIAccessibility.isReduceMotionEnabled ? .none : .automatic)
         }
     }
 

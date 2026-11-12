@@ -27,6 +27,7 @@ public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction:
     /// User and MessageId
     public typealias TapAvatarClosure = (User, String) -> ()
     
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.chatTheme) private var theme
 
@@ -439,7 +440,7 @@ public struct ChatView<MessageContent: View, InputViewContent: View, MenuAction:
             leadingPadding: messageCustomizationParameters.avatarSize + MessageView.horizontalScreenEdgePadding + MessageView.horizontalSpacing,
             trailingPadding: MessageView.statusViewWidth + MessageView.horizontalScreenEdgePadding + MessageView.horizontalSpacing,
             font: messageCustomizationParameters.font,
-            animationDuration: chatCustomizationParameters.messageMenuAnimationDuration,
+            animationDuration: reduceMotion ? 0 : chatCustomizationParameters.messageMenuAnimationDuration,
             onAction: menuActionClosure(row.message),
             reactionHandler: MessageMenu.ReactionConfig(
                 delegate: chatCustomizationParameters.reactionDelegate,
