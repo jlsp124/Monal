@@ -103,10 +103,13 @@ final class ChatRenderingTests: XCTestCase {
             add(attachment)
 
             for i in 16..<56 {
-                fixture.messages.append(Message(id: "\(i)", user: friend, createdAt: Date(timeIntervalSince1970: 1_800_000_000 + Double(i)), text: "Incoming \(i)"))
+                let author = i.isMultiple(of: 4) ? me : friend
+                fixture.messages.append(Message(id: "\(i)", user: author, createdAt: Date(timeIntervalSince1970: 1_800_000_000 + Double(i)), text: "Message \(i)"))
             }
-            _ = try await waitForRows(56, in: host)
-            XCTAssertEqual(fixture.messages.map(\.id), (0..<56).map(String.init))
+            let updatedTable = try await waitForRows(56, in: host)
+            let coordinator = try XCTUnwrap(updatedTable.dataSource as? UIList<DummyView>.Coordinator)
+            let renderedIDs = coordinator.sections.flatMap { $0.rows.map { $0.message.id } }
+            XCTAssertEqual(renderedIDs, (0..<56).reversed().map { String($0) })
             window.rootViewController = nil
         }
     }
