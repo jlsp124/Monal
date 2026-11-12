@@ -41,6 +41,14 @@ jobs:
       - name: Install coreutils
         run: brew install coreutils
       - name: Build rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            rust/target
+            rust/LibMonalRustSwiftBridge
+            rust/monal-rust-swift-bridge/generated
+          key: rust-ios-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/**/*.rs', 'rust/build-rust.sh') }}
+      - name: Generate Rust bridge
         run: bash ./rust/build-rust.sh
       - name: Install pods
         working-directory: Monal

@@ -166,6 +166,7 @@ static const int pingFreqencyMinutes = 5;       //about the same Conversations u
     
     [self upgradeBoolUserSettingsIfUnset:@"showNewChatView" toDefault:YES];
     [self upgradeBoolUserSettingsIfUnset:@"ChatHapticsEnabled" toDefault:YES];
+    [self upgradeIntegerUserSettingsIfUnset:@"ChatReplySwipeDirection" toDefault:0];
     
     [self upgradeBoolUserSettingsIfUnset:@"debugDtmfSending" toDefault:NO];
     

@@ -339,7 +339,7 @@ struct MessageMenu<MainButton: View, ActionEnum: MessageMenuAction>: View {
             }
             
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(Int(animationDuration * 333))) {
-                withAnimation(.easeOut) {
+                withAnimation(.easeOut(duration: animationDuration)) {
                     messageMenuOpacity = 0
                     backgroundOpacity = 0
                 }
