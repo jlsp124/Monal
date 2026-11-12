@@ -1,0 +1,177 @@
+//
+//  AttachmentsEditor.swift
+//  Chat
+//
+//  Created by Alex.M on 22.06.2022.
+//
+
+import SwiftUI
+import ExyteMediaPicker
+import ActivityIndicatorView
+
+struct AttachmentsEditor<InputViewContent: View>: View {
+
+    typealias InputViewBuilderParamsClosure = ChatView<EmptyView, InputViewContent, DefaultMessageMenuAction>.InputViewBuilderParamsClosure
+
+    @Environment(\.chatTheme) var theme
+    @Environment(\.mediaPickerTheme) var mediaPickerTheme
+    @Environment(\.mediaPickerThemeIsOverridden) var mediaPickerThemeIsOverridden
+
+    @EnvironmentObject private var keyboardState: KeyboardState
+    @EnvironmentObject private var globalFocusState: GlobalFocusState
+
+    @ObservedObject var inputViewModel: InputViewModel
+
+    var inputViewBuilder: InputViewBuilderParamsClosure
+    var mediaPickerParameters: MediaPickerParameters
+    var availableInputs: [AvailableInputType]
+    var localization: ChatLocalization
+
+    @State private var seleсtedMedias: [Media] = []
+    @State private var currentFullscreenMedia: Media?
+    @State private var inputFieldId = UUID()
+
+    var showingAlbums: Bool {
+        inputViewModel.mediaPickerMode == .albums
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                mediaPicker
+                inputView
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(mediaPickerTheme.main.pickerBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                backToolbarItem
+                titleToolbarItem
+            }
+        }
+    }
+
+    var backToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button {
+                seleсtedMedias = []
+                inputViewModel.attachments.medias = []
+                inputViewModel.showMediaPicker = false
+            } label: {
+                theme.images.backButton
+            }
+        }
+    }
+
+    var titleToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Button {
+                withAnimation {
+                    inputViewModel.mediaPickerMode = showingAlbums ? .photos : .albums
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(localization.recentToggleText)
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(Angle(radians: showingAlbums ? .pi : 0))
+                }
+            }
+        }
+    }
+
+    var mediaPicker: some View {
+        MediaPicker(isPresented: $inputViewModel.showMediaPicker) {
+            seleсtedMedias = $0
+            assembleSelectedMedia()
+        } albumSelectionBuilder: { _, albumSelectionView, _ in
+            albumSelectionView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(mediaPickerTheme.main.pickerBackground)
+                .tint(mediaPickerTheme.main.pickerText)
+        }
+        .didPressCancelCamera {
+            inputViewModel.attachments.medias = []
+            inputViewModel.showMediaPicker = false
+        }
+        .fullscreenMedia($currentFullscreenMedia)
+        .pickerMode($inputViewModel.mediaPickerMode)
+        .setMediaPickerParameters(mediaPickerParameters)
+        .background(theme.colors.mainBG)
+        .onChange(of: currentFullscreenMedia) {
+            assembleSelectedMedia()
+        }
+        .onChange(of: inputViewModel.showMediaPicker) {
+            let showFullscreenPreview = mediaPickerParameters.selectionParameters.showFullscreenPreview
+            let selectionLimit = mediaPickerParameters.selectionParameters.selectionLimit ?? 1
+
+            if selectionLimit == 1 && !showFullscreenPreview {
+                assembleSelectedMedia()
+                inputViewModel.send()
+            }
+        }
+        .applyIf(!mediaPickerThemeIsOverridden) {
+            $0.mediaPickerTheme(
+                main: .init(
+                    pickerText: theme.colors.mainText,
+                    pickerBackground: theme.colors.mainBG,
+                    fullscreenPhotoBackground: theme.colors.mainBG
+                ),
+                selection: .init(
+                    accent: theme.colors.sendButtonBackground
+                )
+            )
+        }
+    }
+
+    func assembleSelectedMedia() {
+        if !seleсtedMedias.isEmpty {
+            inputViewModel.attachments.medias = seleсtedMedias
+        } else if let media = currentFullscreenMedia {
+            inputViewModel.attachments.medias = [media]
+        } else {
+            inputViewModel.attachments.medias = []
+        }
+    }
+
+    @ViewBuilder
+    var inputView: some View {
+        let customInputView = inputViewBuilder(
+            InputViewBuilderParameters(
+                text: $inputViewModel.text,
+                attachments: inputViewModel.attachments,
+                inputViewState: inputViewModel.state,
+                inputViewStyle: .signature,
+                inputViewActionClosure: inputViewModel.inputViewAction()
+            ) {
+                globalFocusState.focus = nil
+            }
+        )
+
+        if customInputView is DummyView {
+            InputView(
+                viewModel: inputViewModel,
+                inputFieldId: inputFieldId,
+                style: .signature,
+                availableInputs: availableInputs,
+                localization: localization
+            )
+        } else {
+            customInputView
+                .customFocus($globalFocusState.focus, equals: .uuid(inputFieldId))
+        }
+    }
+
+    func cameraSelectionHeaderView(cancelClosure: @escaping ()->()) -> some View {
+        HStack {
+            Button(action: cancelClosure) {
+                theme.images.mediaPicker.cross
+                    .imageScale(.large)
+            }
+            .tint(mediaPickerTheme.main.pickerText)
+            .padding(.trailing, 30)
+
+            Spacer()
+        }
+        .padding(.horizontal)
+    }
+}

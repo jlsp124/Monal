@@ -1922,7 +1922,7 @@
 				841898A82957712000FEC77D /* XCRemoteSwiftPackageReference "ViewExtractor" */,
 				849ADF3D2BACF0360009BCD7 /* XCRemoteSwiftPackageReference "cocoalumberjack" */,
 				84F194CF2C15197200F0A994 /* XCRemoteSwiftPackageReference "FrameUp" */,
-				84774DF92D1A956400B15E51 /* XCRemoteSwiftPackageReference "ExyteChat" */,
+				84774DF92D1A956400B15E51 /* XCLocalSwiftPackageReference "ExyteChat" */,
 				84AF79C02DF3C0A900FE3818 /* XCRemoteSwiftPackageReference "TOCropViewController" */,
 				84A8340A2F1156F5004738AE /* XCRemoteSwiftPackageReference "WebRTC" */,
 				84F632EE2F80AAF900A59209 /* XCRemoteSwiftPackageReference "SVGKit" */,
@@ -4559,6 +4559,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		84774DF92D1A956400B15E51 /* XCLocalSwiftPackageReference "ExyteChat" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/ExyteChat;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		3423E274302F7AA400E12E6D /* XCRemoteSwiftPackageReference "FLAnimatedImage" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -4622,14 +4629,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.0.0;
-			};
-		};
-		84774DF92D1A956400B15E51 /* XCRemoteSwiftPackageReference "ExyteChat" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/monal-im/ExyteChat";
-			requirement = {
-				branch = main;
-				kind = branch;
 			};
 		};
 		849ADF3D2BACF0360009BCD7 /* XCRemoteSwiftPackageReference "cocoalumberjack" */ = {
@@ -4747,7 +4746,7 @@
 		};
 		84774DFA2D1A956400B15E51 /* ExyteChat */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 84774DF92D1A956400B15E51 /* XCRemoteSwiftPackageReference "ExyteChat" */;
+			package = 84774DF92D1A956400B15E51 /* XCLocalSwiftPackageReference "ExyteChat" */;
 			productName = ExyteChat;
 		};
 		849ADF3E2BACF0360009BCD7 /* CocoaLumberjack */ = {

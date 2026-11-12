@@ -1,0 +1,660 @@
+//
+//  MessageView.swift
+//  Chat
+//
+//  Created by Alex.M on 23.05.2022.
+//
+
+import SwiftUI
+import MapKit
+
+struct MessageView: View {
+
+    @Environment(\.chatTheme) var theme
+    @Environment(\.chatSize) var chatSize
+    @Environment(\.chatLocalization) var localization
+
+    @ObservedObject var viewModel: ChatViewModel
+
+    @ObservedObject var message: Message
+    let positionInUserGroup: PositionInUserGroup
+    let positionInMessagesSection: PositionInMessagesSection
+    let chatType: ChatType
+    let params: MessageCustomizationParameters
+    let isDisplayingMessageMenu: Bool
+
+    static let widthWithMedia: CGFloat = 204
+    static let statusViewWidth: CGFloat = 10
+    static let horizontalScreenEdgePadding: CGFloat = 12
+    static let horizontalTextPadding: CGFloat = 12
+    static let timeViewTextPadding: CGFloat = 12
+    static let horizontalSpacing: CGFloat = horizontalScreenEdgePadding / 2
+    static let attachmentPadding: CGFloat = 1  // for multiple attachments
+    static let horizontalBubblePadding: CGFloat = 70
+
+    enum TimeViewArrangement {
+        case hstack, vstack, overlay
+    }
+
+    var additionalMediaInset: CGFloat {
+        message.attachments.count > 1 ? MessageView.attachmentPadding * 2 : 0
+    }
+
+    var timeViewArrangement: TimeViewArrangement {
+        let text = message.attributedText
+        if !text.urls.isEmpty && params.linkPreviewLimit > 0 {
+            return .vstack
+        }
+
+        let isCurrentUser = message.user.isCurrentUser
+        let bubblePaddings = MessageView.horizontalScreenEdgePadding * 2 + MessageView.horizontalBubblePadding
+        let avatarViewWithPaddings = params.avatarSize + MessageView.horizontalSpacing
+        let statusViewWithPaddings = MessageView.statusViewWidth + MessageView.horizontalSpacing
+        let textPaddings = MessageView.horizontalTextPadding * 2
+        let widthWithoutMedia =
+            chatSize.width
+            - bubblePaddings
+            - (isCurrentUser && params.showAvatar ? 0 : avatarViewWithPaddings)
+            - (isCurrentUser ? MessageView.statusViewWidth : 0)
+            - textPaddings
+
+        let maxWidth = message.attachments.isEmpty && message.files.isEmpty
+            ? widthWithoutMedia
+            : MessageView.widthWithMedia - textPaddings
+
+        let finalWidth = text.width(withConstrainedWidth: maxWidth, font: params.font)
+        let lastLineWidth = text.lastLineWidth(labelWidth: maxWidth, font: params.font)
+        let numberOfLines = text.numberOfLines(labelWidth: maxWidth, font: params.font)
+
+        let timeWidth = AttributedString(message.formattedDate).width(withConstrainedWidth: maxWidth, font: params.timeFont) + MessageView.timeViewTextPadding * 2
+
+        if numberOfLines == 1, finalWidth + CGFloat(timeWidth) < maxWidth {
+            return .hstack
+        }
+        if lastLineWidth + CGFloat(timeWidth) < finalWidth {
+            return .overlay
+        }
+        return .vstack
+    }
+
+    var reactionViewWidth: CGFloat {
+        struct Cache { static var value: CGFloat? }
+        if let value = Cache.value { return value }
+
+        let value = AttributedString("🙃️️️️").width(withConstrainedWidth: chatSize.width, font: params.font) + ReactionBubble.padding * 2
+
+        Cache.value = value
+        return value
+    }
+
+    var showAvatar: Bool {
+        isDisplayingMessageMenu
+            || positionInUserGroup == .single
+            || (chatType == .conversation && positionInUserGroup == .last)
+            || (chatType == .comments && positionInUserGroup == .first)
+    }
+
+    var topPadding: CGFloat {
+        if chatType == .comments { return 0 }
+        return positionInUserGroup.isTop && !positionInMessagesSection.isTop ? 8 : 4
+    }
+
+    var bottomPadding: CGFloat {
+        if chatType == .conversation { return 0 }
+        return positionInUserGroup.isTop ? 8 : 4
+    }
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: MessageView.horizontalSpacing) {
+            if params.showAvatar, !message.user.isCurrentUser {
+                avatarView
+            }
+
+            VStack(alignment: message.user.isCurrentUser ? .trailing : .leading, spacing: 2) {
+                if !isDisplayingMessageMenu, let reply = message.replyMessage?.toMessage() {
+                    replyBubbleView(reply)
+                        .opacity(theme.style.replyOpacity)
+                        .padding(message.user.isCurrentUser ? .trailing : .leading, 10)
+                        .overlay(alignment: message.user.isCurrentUser ? .trailing : .leading) {
+                            Capsule()
+                                .foregroundColor(theme.colors.mainTint)
+                                .frame(width: 2)
+                        }
+                }
+
+                bubbleView(message)
+            }
+
+            if message.user.isCurrentUser, let status = message.status {
+                MessageStatusView(status: status) {
+                    if case let .error(draft) = status {
+                        // Do nothing when the error status icon is clicked
+                    }
+                }
+                .viewSize(MessageView.statusViewWidth)
+            }
+        }
+        .padding(.top, topPadding)
+        .padding(.bottom, bottomPadding)
+        .padding(.horizontal, MessageView.horizontalScreenEdgePadding)
+        .padding(
+            message.user.isCurrentUser ? .leading : .trailing, MessageView.horizontalBubblePadding
+        )
+        .frame(
+            maxWidth: chatSize.width,
+            alignment: message.user.isCurrentUser ? .trailing : .leading
+        )
+    }
+
+    @ViewBuilder
+    func bubbleView(_ message: Message) -> some View {
+        VStack(
+            alignment: message.user.isCurrentUser ? .leading : .trailing,
+            spacing: -reactionViewWidth / 3
+        ) {
+            if !isDisplayingMessageMenu && !message.reactions.isEmpty {
+                reactionsView(message)
+                    .zIndex(1)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                if params.showUsername, !message.user.isCurrentUser {
+                    Text(message.user.name)
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, MessageView.horizontalTextPadding)
+                }
+
+                if let staticLocation = message.staticLocation {
+                    staticLocationView(staticLocation)
+                }
+
+                if let liveLocation = message.liveLocation {
+                    liveLocationView(liveLocation)
+                }
+
+                if !message.attachments.isEmpty {
+                    attachmentsView(message)
+                }
+
+                if !message.files.isEmpty {
+                    ForEach(message.files) { file in
+                        FileView(file: file, messageParams: params)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 4)
+                    }
+
+                    if !message.hasText {
+                        HStack {
+                            Spacer()
+                            messageTimeView()
+                                .padding(.trailing, 12)
+                                .padding(.bottom, 8)
+                        }
+                    }
+                }
+
+                if message.hasText {
+                    textWithTimeView(message)
+                        .font(Font(params.font))
+                }
+
+                if let recording = message.recording {
+                    VStack(alignment: .trailing, spacing: 8) {
+                        recordingView(recording)
+                        messageTimeView()
+                            .padding(.trailing, 12)
+                            .padding(.bottom, 8)
+                    }
+                }
+            }
+            .padding(.top, (params.showUsername && !message.user.isCurrentUser) || message.attachments.isEmpty ? 8 : 0)
+            .padding(.bottom, message.hasText ? 8 : 0)
+            .bubbleBackground(message, params: params, theme: theme)
+            .zIndex(0)
+        }
+        .applyIf(isDisplayingMessageMenu) {
+            $0.frameGetter($viewModel.messageFrame)
+        }
+    }
+
+    @ViewBuilder
+    func replyBubbleView(_ message: Message) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(message.user.name)
+                .fontWeight(.semibold)
+                .padding(.horizontal, MessageView.horizontalTextPadding)
+
+            if !message.attachments.isEmpty {
+                attachmentsView(message)
+                    .padding(.top, 4)
+                    .padding(.bottom, message.hasText ? 4 : 0)
+            }
+
+            if !message.files.isEmpty {
+                ForEach(message.files) { file in
+                    FileView(file: file, messageParams: params)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 4)
+                }
+            }
+
+            if message.hasText {
+                MessageTextView(
+                    attributedText: message.attributedText,
+                    userType: message.user.type,
+                    params: params
+                )
+                .padding(.horizontal, MessageView.horizontalTextPadding)
+            }
+
+            if let recording = message.recording {
+                recordingView(recording)
+            }
+        }
+        .font(.caption2)
+        .padding(.vertical, 8)
+        .bubbleBackground(message, params: params, theme: theme, isReply: true)
+    }
+
+    @ViewBuilder
+    var avatarView: some View {
+        Group {
+            if showAvatar {
+                if let builder = params.avatarBuilder {
+                    builder(message.user)
+                } else if message.user.avatarURL != nil || message.user.avatarImage != nil {
+                    AvatarImageView(user: message.user, avatarSize: params.avatarSize, avatarCacheKey: message.user.avatarCacheKey)
+                        .contentShape(Circle())
+                        .onTapGesture {
+                            params.tapAvatarClosure?(message.user, message.id)
+                            viewModel.focusTheInputTextView()
+                        }
+                } else {
+                    AvatarNameView(name: message.user.name, avatarSize: params.avatarSize)
+                        .contentShape(Circle())
+                        .onTapGesture {
+                            params.tapAvatarClosure?(message.user, message.id)
+                            viewModel.focusTheInputTextView()
+                        }
+                }
+            } else {
+                Color.clear
+            }
+        }
+        .viewSize(params.avatarSize)
+    }
+
+    @ViewBuilder
+    func attachmentsView(_ message: Message) -> some View {
+        AttachmentsGrid(attachments: message.attachments, isCurrentUser: message.user.isCurrentUser) { attachment, isCancel in
+            if isCancel {
+                let update = AttachmentUploadUpdate(
+                    messageId: message.id,
+                    attachmentId: attachment.id,
+                    updateAction: AttachmentUploadUpdate.UpdateAction.cancel
+                )
+                viewModel.updateAttachmentStatus(update)
+            } else {
+                viewModel.presentAttachmentFullScreen(attachment)
+            }
+        }
+        .applyIf(message.attachments.count > 1) {
+            $0
+                .padding(.top, MessageView.attachmentPadding)
+                .padding(.horizontal, MessageView.attachmentPadding)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if !message.hasText {
+                messageTimeView(needsCapsule: true)
+                    .padding(4)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    func staticLocationView(_ location: StaticLocation) -> some View {
+        let coordinate = location.coordinate
+
+        Map(position: .constant(.region(.closeUp(around: coordinate)))) {
+            Annotation("", coordinate: coordinate) {
+                staticLocationPin
+            }
+        }
+        .allowsHitTesting(false)
+        .viewSize(200)
+        .cornerRadius(12)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            viewModel.presentFullscreenLocation(message.id)
+        }
+    }
+
+    @ViewBuilder
+    func liveLocationView(_ liveLocation: LiveLocation) -> some View {
+        let coordinate = liveLocation.coordinate
+
+        VStack(spacing: 0) {
+            Map(position: .constant(.region(.closeUp(around: coordinate)))) {
+                Annotation("", coordinate: coordinate) {
+                    liveLocationPin
+                }
+            }
+            .allowsHitTesting(false)
+            .saturation(liveLocation.isEnded ? 0 : 1)
+            .frame(height: 150)
+
+            liveLocationFooter(liveLocation)
+        }
+        .frame(width: 200)
+        .cornerRadius(12)
+        .clipped()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            viewModel.presentFullscreenLocation(message.id)
+        }
+    }
+
+    var staticLocationPin: some View {
+        Image(systemName: "mappin.circle.fill")
+            .resizable()
+            .viewSize(30)
+            .foregroundStyle(.white, theme.colors.statusError)
+            .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+    }
+
+    var liveLocationPin: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Circle()
+                    .fill(Color.white)
+                    .viewSize(44)
+                pinAvatar
+                    .viewSize(38)
+                    .clipShape(Circle())
+            }
+            .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
+
+            PinTailShape()
+                .fill(Color.white)
+                .frame(width: 14, height: 8)
+                .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
+
+            Circle()
+                .fill(theme.colors.mainTint)
+                .viewSize(10)
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                .offset(y: -3)
+        }
+    }
+
+    @ViewBuilder
+    var pinAvatar: some View {
+        if let url = message.user.avatarURL {
+            AvatarImageView(user: message.user, avatarSize: 38)
+        } else {
+            AvatarNameView(name: message.user.name, avatarSize: 38)
+                .background(theme.colors.mainTint)
+        }
+    }
+
+    @ViewBuilder
+    func liveLocationFooter(_ liveLocation: LiveLocation) -> some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let isActive = liveLocation.isActive
+            HStack(spacing: 10) {
+                LiveLocationStatusText(
+                    isActive: isActive,
+                    subtitle: liveLocation.updatedAgoText(localization: localization)
+                )
+                Spacer(minLength: 4)
+                if isActive {
+                    liveLocationCountdownRing(liveLocation)
+                }
+            }
+            .padding(12, 10)
+            .background(isActive ? theme.colors.mainTint : Color.gray)
+        }
+    }
+
+    func liveLocationCountdownRing(_ liveLocation: LiveLocation) -> some View {
+        let totalMinutes = max(0, Int(ceil(liveLocation.expiresAt.timeIntervalSince(Date()) / 60)))
+        // under an hour left: show the minute count, like "15"; an hour or more: whole hours, like "8h"
+        let label = totalMinutes >= 60 ? "\(totalMinutes / 60)h" : "\(totalMinutes)"
+        let progress = liveLocation.remainingFraction()
+
+        return ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.3), lineWidth: 2)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(Color.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.linear(duration: 1), value: progress)
+
+            Text(label)
+                .font(.footnote.weight(.semibold))
+                .monospacedDigit()
+                .foregroundColor(.white)
+        }
+        .viewSize(32)
+    }
+
+    @ViewBuilder
+    func textWithTimeView(_ message: Message) -> some View {
+        let messageView = MessageTextView(
+            attributedText: message.attributedText,
+            userType: message.user.type,
+            params: params
+        )
+        .applyIf(!message.attachments.isEmpty || !message.files.isEmpty) {
+            $0.frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, MessageView.horizontalTextPadding)
+
+        let timeView = messageTimeView()
+            .padding(.horizontal, MessageView.timeViewTextPadding)
+
+            Group {
+                switch timeViewArrangement {
+                case .hstack:
+                    HStack(alignment: .lastTextBaseline, spacing: 0) {
+                        messageView
+                            .lineLimit(1)
+                        if !message.attachments.isEmpty || !message.files.isEmpty {
+                            Spacer()
+                        }
+                        timeView
+                    }
+                case .vstack:
+                    VStack(alignment: .trailing, spacing: 4) {
+                        messageView
+                        timeView
+                    }
+                case .overlay:
+                    messageView
+                        .overlay(alignment: .bottomTrailing) {
+                            timeView
+                        }
+                }
+            }
+    }
+
+    @ViewBuilder
+    func recordingView(_ recording: Recording) -> some View {
+        RecordWaveformWithButtons(
+            recordPlayer: viewModel.messageRecordingPlayer,
+            recording: recording,
+            colorButton: message.user.isCurrentUser
+                ? theme.colors.messageMyBG : theme.colors.mainBG,
+            colorButtonBg: message.user.isCurrentUser
+                ? theme.colors.mainBG : theme.colors.messageMyBG,
+            colorWaveform: theme.colors.messageText(message.user.type)
+        )
+        .padding(.horizontal, MessageView.horizontalTextPadding)
+        .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    func messageTimeView(needsCapsule: Bool = false) -> some View {
+        if params.showTimeView {
+            Group {
+                if needsCapsule {
+                    MessageTimeWithCapsuleView(text: message.formattedDate, isCurrentUser: message.user.isCurrentUser, encrypted: message.encrypted)
+                } else {
+                    MessageTimeView(text: message.formattedDate, userType: message.user.type, encrypted: message.encrypted)
+                }
+            }
+            .font(Font(params.timeFont))
+        }
+    }
+}
+
+private struct PinTailShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+extension View {
+
+    @ViewBuilder
+    func bubbleBackground(_ message: Message, params: MessageCustomizationParameters, theme: ChatTheme, isReply: Bool = false) -> some View {
+        let radius: CGFloat = !message.attachments.isEmpty ? 12 : 20
+        let additionalMediaInset: CGFloat = message.attachments.count > 1 ? 2 : 0
+        let fileMessageBubbleWidth: CGFloat = 255
+        self.frame(
+            width: message.attachments.isEmpty && message.files.isEmpty
+            ? nil : (message.files.isEmpty ? MessageView.widthWithMedia + additionalMediaInset : fileMessageBubbleWidth)
+        )
+        .foregroundColor(theme.colors.messageText(message.user.type))
+        .background {
+            if (params.showUsername && !message.user.isCurrentUser) || isReply || message.hasText || message.recording != nil || !message.files.isEmpty {
+                RoundedRectangle(cornerRadius: radius)
+                    .foregroundColor(theme.colors.messageBG(message.user.type))
+                    .opacity(isReply ? theme.style.replyOpacity : 1)
+            }
+        }
+        .cornerRadius(radius)
+    }
+}
+
+//#if DEBUG
+//    struct MessageView_Preview: PreviewProvider {
+//        static let stan = User(id: "stan", name: "Stan", avatarURL: nil, isCurrentUser: false)
+//        static let john = User(id: "john", name: "John", avatarURL: nil, isCurrentUser: true)
+//
+//        static private var extraShortText = "Sss"
+//        static private var extraShortTextWithNewline = "H\nJ"
+//        static private var shortText = "Hi, buddy!"
+//        static private var longText =
+//            "Hello hello hello hello hello hello hello hello hello hello hello hello hello\n hello hello hello hello d d d d d d d d"
+//
+//        static private var replyedMessage = Message(
+//            id: UUID().uuidString,
+//            user: stan,
+//            status: .read,
+//            text: longText,
+//            attachments: [
+//                Attachment.randomImage(),
+//                Attachment.randomImage(),
+//                Attachment.randomImage(),
+//                Attachment.randomImage(),
+//                Attachment.randomImage(),
+//            ],
+//            reactions: [
+//                Reaction(
+//                    user: john, createdAt: Date.now.addingTimeInterval(-70), type: .emoji("🔥"),
+//                    status: .sent),
+//                Reaction(
+//                    user: stan, createdAt: Date.now.addingTimeInterval(-60), type: .emoji("🥳"),
+//                    status: .sent),
+//                Reaction(
+//                    user: stan, createdAt: Date.now.addingTimeInterval(-50), type: .emoji("🤠"),
+//                    status: .sent),
+//                Reaction(
+//                    user: stan, createdAt: Date.now.addingTimeInterval(-40), type: .emoji("🧠"),
+//                    status: .sent),
+//                Reaction(
+//                    user: stan, createdAt: Date.now.addingTimeInterval(-30), type: .emoji("🥳"),
+//                    status: .sent),
+//                Reaction(
+//                    user: stan, createdAt: Date.now.addingTimeInterval(-20), type: .emoji("🤯"),
+//                    status: .sent),
+//                Reaction(
+//                    user: john, createdAt: Date.now.addingTimeInterval(-10), type: .emoji("🥰"),
+//                    status: .sending),
+//            ]
+//        )
+//
+//        static private var message = Message(
+//            id: UUID().uuidString,
+//            user: stan,
+//            status: .read,
+//            text: shortText,
+//            replyMessage: replyedMessage.toReplyMessage()
+//        )
+//
+//        static private var shortMessage = Message(
+//            id: UUID().uuidString,
+//            user: stan,
+//            status: .read,
+//            text: extraShortText
+//        )
+//
+//        static private var extrShortMessage = Message(
+//            id: UUID().uuidString,
+//            user: stan,
+//            status: .read,
+//            text: extraShortTextWithNewline
+//        )
+//        
+//        static var previews: some View {
+//            ZStack {
+//                Color.yellow.ignoresSafeArea()
+//                
+//                VStack {
+//                    MessageView(
+//                        viewModel: ChatViewModel(),
+//                        message: extrShortMessage,
+//                        positionInUserGroup: .single,
+//                        positionInMessagesSection: .single,
+//                        chatType: .conversation,
+//                        avatarSize: 32,
+//                        tapAvatarClosure: nil,
+//                        messageStyler: AttributedString.init,
+//                        shouldShowPreviewForLink: { _ in true },
+//                        isDisplayingMessageMenu: false,
+//                        showMessageTimeView: true,
+//                        messageLinkPreviewLimit: 8,
+//                        font: UIFontMetrics.default.scaledFont(for: UIFont.systemFont(ofSize: 15))
+//                    )
+//                    
+//                    MessageView(
+//                        viewModel: ChatViewModel(),
+//                        message: replyedMessage,
+//                        positionInUserGroup: .single,
+//                        positionInMessagesSection: .single,
+//                        chatType: .conversation,
+//                        avatarSize: 32,
+//                        tapAvatarClosure: nil,
+//                        messageStyler: AttributedString.init,
+//                        shouldShowPreviewForLink: { _ in true },
+//                        isDisplayingMessageMenu: false,
+//                        showMessageTimeView: true,
+//                        messageLinkPreviewLimit: 8,
+//                        font: UIFontMetrics.default.scaledFont(for: UIFont.systemFont(ofSize: 15))
+//                    )
+//                }
+//                
+//            }
+//        }
+//    }
+//#endif
