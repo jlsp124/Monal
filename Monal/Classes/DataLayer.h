@@ -210,6 +210,7 @@ extern NSString* const kMessageTypeFiletransfer;
  if the server replies with an error for a message, store it
  */
 -(void) setMessageId:(NSString* _Nonnull) messageid andJid:(NSString*) jid errorType:(NSString *_Nonnull) errorType errorReason:(NSString *_Nonnull)errorReason;
+-(void) prepareMessageForRetry:(NSNumber*) historyID NS_SWIFT_NAME(prepareMessage(forRetry:));
 -(void) clearErrorOfMessageId:(NSString* _Nonnull) messageid;
 
 /**

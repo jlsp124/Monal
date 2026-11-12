@@ -253,7 +253,11 @@ static NSMutableDictionary* _singletonCache;
     XMPPMessage* messageNode = data[@"message"];
     MLAssert(messageNode != nil, @"Notification without message node");
     if([messageNode.id isEqualToString:self.messageId])
+    {
+        self.errorType = @"";
+        self.errorReason = @"";
         self.hasBeenSent = YES;
+    }
 }
 
 -(void) handleMessageReceived:(NSNotification*) notification

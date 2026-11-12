@@ -12,13 +12,14 @@ import Network
 class NetworkMonitor: ObservableObject {
     private let networkMonitor = NWPathMonitor()
     private let workerQueue = DispatchQueue(label: "Monitor")
-    var isConnected = false
+    @Published private(set) var isConnected = false
+
+    deinit { networkMonitor.cancel() }
 
     init() {
         networkMonitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
                 self?.isConnected = path.status == .satisfied
-                self?.objectWillChange.send()
             }
         }
         networkMonitor.start(queue: workerQueue)

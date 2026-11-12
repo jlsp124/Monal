@@ -14,22 +14,31 @@ struct MessageStatusView: View {
     var body: some View {
         Group {
             switch status {
+            case .queued:
+                Image(systemName: "tray")
+                    .resizable()
+                    .foregroundColor(theme.colors.statusGray)
+                    .accessibilityLabel(Text("Queued"))
             case .sending:
                 theme.images.message.sending
                     .resizable()
                     .foregroundColor(theme.colors.statusGray)
+                    .accessibilityLabel(Text("Sending"))
             case .sent:
                 theme.images.message.sent
                     .resizable()
                     .foregroundColor(theme.colors.messageMyBG)
+                    .accessibilityLabel(Text("Sent to server"))
            case .received:
                 theme.images.message.received
                     .resizable()
                     .foregroundColor(theme.colors.messageMyBG)
+                    .accessibilityLabel(Text("Delivered"))
             case .readBy:
                 theme.images.message.read
                     .resizable()
                     .foregroundColor(theme.colors.messageMyBG)
+                    .accessibilityLabel(Text("Read"))
             case .error:
                 Button {
                     onRetry()
@@ -38,6 +47,7 @@ struct MessageStatusView: View {
                         .resizable()
                 }
                 .foregroundColor(theme.colors.statusError)
+                .accessibilityLabel(Text("Failed. Retry message"))
             }
         }
     }

@@ -1650,6 +1650,8 @@ static NSDateFormatter* dbFormatter;
         NSString* query = @"UPDATE message_history SET sent=? WHERE messageid=? AND NOT sent;";
         DDLogVerbose(@"setting sent %@, %@", messageid, jid);
         [self.db executeNonQuery:query andArguments:@[[NSNumber numberWithBool:_sent], messageid]];
+        if(_sent)
+            [self.db executeNonQuery:@"UPDATE message_history SET errorType='', errorReason='' WHERE messageid=? AND buddy_name=?;" andArguments:@[messageid, jid]];
     }];
 }
 
@@ -1674,6 +1676,13 @@ static NSDateFormatter* dbFormatter;
         NSString* query = @"UPDATE message_history SET errorType=?, errorReason=? WHERE messageid=? AND buddy_name=?;";
         DDLogVerbose(@"setting message error %@, %@ [%@, %@]", messageid, jid, errorType, errorReason);
         [self.db executeNonQuery:query andArguments:@[errorType, errorReason, messageid, jid]];
+    }];
+}
+
+-(void) prepareMessageForRetry:(NSNumber*) historyID
+{
+    [self.db voidWriteTransaction:^{
+        [self.db executeNonQuery:@"UPDATE message_history SET errorType='', errorReason='', sent=0 WHERE message_history_id=? AND inbound=0 AND received=0;" andArguments:@[historyID]];
     }];
 }
 

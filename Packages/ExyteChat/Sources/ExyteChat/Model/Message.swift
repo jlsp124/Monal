@@ -10,6 +10,7 @@ import SwiftUI
 open class Message: ObservableObject, Identifiable {
 
     public enum Status: Equatable, Hashable, Sendable {
+        case queued
         case sending
         case sent
         case received
@@ -18,6 +19,8 @@ open class Message: ObservableObject, Identifiable {
 
         public func hash(into hasher: inout Hasher) {
             switch self {
+            case .queued:
+                return hasher.combine("queued")
             case .sending:
                 return hasher.combine("sending")
             case .sent:
@@ -33,6 +36,8 @@ open class Message: ObservableObject, Identifiable {
 
         public static func == (lhs: Message.Status, rhs: Message.Status) -> Bool {
             switch (lhs, rhs) {
+            case (.queued, .queued):
+                return true
             case (.sending, .sending):
                 return true
             case (.sent, .sent):

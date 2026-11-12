@@ -130,6 +130,7 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var isTyping = false
     @State private var typingTimer: Timer?
+    @State private var connectionState: xmppState = .stateDisconnected
     @State private var scrollToMessage: ScrollToParams?
 
     init(contact: ObservableKVOWrapper<MLContact>) {
@@ -509,6 +510,14 @@ struct ChatView: View {
         }]
     }
 
+    private func refreshConnectionState() {
+        let next = account.accountState
+        guard next != connectionState else { return }
+        connectionState = next
+        // Status is computed from the real XMPP session, not simply Wi-Fi reachability.
+        for message in messages { message.objectWillChange.send() }
+    }
+
     var body: some View {
         ExyteChatView(messages: messages, chatType: .conversation, replyMode: .quote) { draft in
             let replyTo = messages.first(where: { $0.id == draft.replyMessage?.id })?.innerMessage.obj
@@ -613,9 +622,10 @@ struct ChatView: View {
                                         Task { @MainActor in
                                             let messageId = mlMessage.messageId
                                             await Task.detached(priority: .userInitiated) {
-                                                DataLayer.sharedInstance().clearError(ofMessageId: messageId)
+                                                DataLayer.sharedInstance().prepareMessage(forRetry: mlMessage.messageDBId)
                                             }.value
 
+                                            if !mlMessage.hasBeenReceived { mlMessage.hasBeenSent = false }
                                             mlMessage.errorType = ""
                                             mlMessage.errorReason = ""
                                             let isUpload = mlMessage.messageType == kMessageTypeFiletransfer
@@ -910,6 +920,27 @@ struct ChatView: View {
                 )
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if connectionState.rawValue < xmppState.stateBound.rawValue {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "network")
+                    Text(connectionState == .stateLoggedOut ? "Account disconnected. Unsent messages remain queued." : "Connecting… Unsent messages remain queued.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.bar)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name(kMonalAccountStatusChanged)).receive(on: RunLoop.main)) { notice in
+            guard let id = notice.userInfo?[kAccountID] as? NSNumber, id == account.accountID else { return }
+            refreshConnectionState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in refreshConnectionState() }
         .toolbarRole(.editor)       //make sure to never show the title of the previous view in the back bar button
         .canContainExternalLinks()
         .addLoadingOverlay(overlay)
@@ -917,6 +948,7 @@ struct ChatView: View {
         .onAppear {
             MLNotificationManager.sharedInstance().currentContact = self.contact.obj
             loadChatBackground()
+            refreshConnectionState()
 
             checkOmemoSupport(withAlert:false)
             let messageDraft = DataLayer.sharedInstance().loadMessageDraft(self.contact.contactJid, forAccount:self.account.accountID)
@@ -1033,6 +1065,7 @@ struct ChatView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name(kMonalBackgroundChanged)).receive(on: RunLoop.main)) { notification in
             loadChatBackground()
+            refreshConnectionState()
         }
         .onReceive(Publishers.Merge(
             NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification).receive(on: RunLoop.main),
@@ -1140,7 +1173,8 @@ class ChatViewMessage: ExyteChat.Message {
                 case let message where message.hasBeenSent:
                     return .sent
                 default:
-                    return .sending
+                    let ready = innerMessage.obj.chatContact.account?.accountState.rawValue ?? xmppState.stateDisconnected.rawValue
+                    return ready >= xmppState.stateBound.rawValue ? .sending : .queued
             }
         }
         set {}
@@ -1254,6 +1288,12 @@ class ChatViewMessage: ExyteChat.Message {
         let user = ChatViewUser(message.contact as! NSObject&MLContactProtocol)
         // We don't need to properly initialize the properties that we overrode with computed properties
         super.init(id: message.id, user: user, createdAt: Date(), text: "")
+
+        NotificationCenter.default.publisher(for: Notification.Name(kMonalAccountStatusChanged))
+            .receive(on: RunLoop.main)
+            .filter { ($0.userInfo?[kAccountID] as? NSNumber) == message.accountID }
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &subscriptions)
 
         // Forward innerMessage changes as ChatViewMessage changes
         innerMessage.objectWillChange
