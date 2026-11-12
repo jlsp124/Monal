@@ -6,6 +6,7 @@ import Foundation
 import Combine
 import ExyteMediaPicker
 import SwiftUI
+@preconcurrency import AVFoundation
 
 @MainActor
 final class InputViewModel: ObservableObject {
@@ -21,11 +22,20 @@ final class InputViewModel: ObservableObject {
     @Published var mediaPickerMode = MediaPickerMode.photos
 
     @Published var showActivityIndicator = false
+    @Published var recordingError: String?
 
     var recordingPlayer: RecordingPlayer?
     var didSendMessage: ((DraftMessage) -> Void)?
 
-    private var recorder = Recorder()
+    private let recorder: any AudioRecording
+    private var recordingGeneration = UUID()
+    private var recordingTask: Task<Void, Never>?
+    private var recordingCleanupTask: Task<Void, Never>?
+    private var isSending = false
+
+    init(recorder: any AudioRecording = Recorder()) {
+        self.recorder = recorder
+    }
 
     private var saveEditingClosure: ((String) -> Void)?
 
@@ -34,15 +44,30 @@ final class InputViewModel: ObservableObject {
     
     func setRecorderSettings(recorderSettings: RecorderSettings = RecorderSettings()) {
         Task {
-            await self.recorder.setRecorderSettings(recorderSettings)
+            if let recorder = self.recorder as? Recorder {
+                await recorder.setRecorderSettings(recorderSettings)
+            }
         }
     }
 
     func onStart() {
+        subscriptions.removeAll()
         subscribeValidation()
+        NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+            .merge(with: NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification))
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                if notification.name == AVAudioSession.interruptionNotification,
+                   notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt != AVAudioSession.InterruptionType.began.rawValue {
+                    return
+                }
+                self?.cancelRecording()
+            }
+            .store(in: &subscriptions)
     }
 
     func onStop() {
+        cancelRecording()
         subscriptions.removeAll()
     }
 
@@ -58,9 +83,16 @@ final class InputViewModel: ObservableObject {
     }
 
     func send() {
+        guard !isSending, state != .waitingForRecordingPermission else { return }
+        isSending = true
+        let generation = recordingGeneration
         Task {
+            defer { isSending = false }
             await recorder.stopRecording()
             await recordingPlayer?.reset()
+            guard recordingGeneration == generation else { return }
+            if let recording = attachments.recording, recording.url == nil { return }
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.medias.isEmpty || !attachments.files.isEmpty || attachments.recording?.url != nil || attachments.staticLocation != nil || attachments.liveLocation != nil else { return }
             sendMessage()
         }
     }
@@ -93,31 +125,25 @@ final class InputViewModel: ObservableObject {
         case .send:
             send()
         case .recordAudioTap:
-            Task {
-                state = await recorder.isAllowedToRecordAudio ? .isRecordingTap : .waitingForRecordingPermission
-                recordAudio()
-            }
+            recordAudio(holding: false)
         case .recordAudioHold:
-            Task {
-                state = await recorder.isAllowedToRecordAudio ? .isRecordingHold : .waitingForRecordingPermission
-                recordAudio()
-            }
+            recordAudio(holding: true)
         case .recordAudioLock:
             state = .isRecordingTap
         case .stopRecordAudio:
+            let generation = recordingGeneration
             Task {
                 await recorder.stopRecording()
-                if let _ = attachments.recording {
+                guard recordingGeneration == generation else { return }
+                if let recording = attachments.recording, recording.url != nil {
                     state = .hasRecording
+                } else {
+                    cancelRecording()
                 }
                 await recordingPlayer?.reset()
             }
         case .deleteRecord:
-            Task {
-                unsubscribeRecordPlayer()
-                await recorder.stopRecording()
-                attachments.recording = nil
-            }
+            cancelRecording()
         case .playRecord:
             state = .playingRecording
             if let recording = attachments.recording {
@@ -139,19 +165,51 @@ final class InputViewModel: ObservableObject {
         }
     }
 
-    private func recordAudio() {
-        Task { @MainActor [recorder] in
-            if await recorder.isRecording { return }
-            attachments.recording = Recording()
+    func cancelRecording() {
+        recordingGeneration = UUID()
+        recordingTask?.cancel()
+        recordingTask = nil
+        let discardedURL = attachments.recording?.url
+        unsubscribeRecordPlayer()
+        attachments.recording = nil
+        state = text.isEmpty && attachments.medias.isEmpty && attachments.files.isEmpty && attachments.staticLocation == nil && attachments.liveLocation == nil ? .empty : .hasTextOrMedia
+        recordingCleanupTask = Task {
+            await recorder.cancelRecording()
+            await recordingPlayer?.reset()
+            if let discardedURL { try? FileManager.default.removeItem(at: discardedURL) }
+        }
+    }
+
+    private func recordAudio(holding: Bool) {
+        guard attachments.recording == nil else { return }
+        let generation = UUID()
+        recordingGeneration = generation
+        state = .waitingForRecordingPermission
+        attachments.recording = Recording()
+        let cleanup = recordingCleanupTask
+        recordingTask = Task { @MainActor [recorder] in
+            await cleanup?.value
+            guard recordingGeneration == generation else { return }
+            let allowed = await recorder.isAllowedToRecordAudio
+            guard recordingGeneration == generation else { return }
+            if allowed { state = holding ? .isRecordingHold : .isRecordingTap }
             let url = await recorder.startRecording { duration, samples in
                 DispatchQueue.main.async { [weak self] in
+                    guard self?.recordingGeneration == generation else { return }
                     self?.attachments.recording?.duration = duration
                     self?.attachments.recording?.waveformSamples = samples
                 }
             }
-            if state == .waitingForRecordingPermission {
-                state = .isRecordingTap
+            guard recordingGeneration == generation, !Task.isCancelled else {
+                if let url { try? FileManager.default.removeItem(at: url) }
+                return
             }
+            guard let url else {
+                cancelRecording()
+                recordingError = "Could not start recording. Check microphone access in Settings and try again."
+                return
+            }
+            if state == .waitingForRecordingPermission { state = .isRecordingTap }
             attachments.recording?.url = url
         }
     }

@@ -71,6 +71,9 @@ extension InputView {
             .viewSize(48)
             .circleBackground(theme.colors.sendButtonBackground)
             .frameGetter($recordButtonFrame)
+            .accessibilityLabel(Text("Record voice message"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onAction(.recordAudioTap) }
     }
 
     var deleteRecordButton: some View {
@@ -82,6 +85,7 @@ extension InputView {
                 .padding(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 8))
         }
         .frameGetter($deleteRecordFrame)
+        .accessibilityLabel(Text("Discard recording"))
     }
 
     var stopRecordButton: some View {
@@ -96,6 +100,8 @@ extension InputView {
                         .shadow(color: .black.opacity(0.4), radius: 1)
                 )
         }
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityLabel(Text("Stop recording"))
     }
 
     var lockRecordButton: some View {
@@ -245,8 +251,9 @@ extension InputView {
                 }
             }
             .onEnded { value in
+                tapDelayTimer?.invalidate()
+                tapDelayTimer = nil
                 if !cancelGesture {
-                    tapDelayTimer = nil
                     if recordButtonFrame.contains(value.location) {
                         if let dragStart = dragStart, Date().timeIntervalSince(dragStart) < tapDelay {
                             onAction(.recordAudioTap)

@@ -75,6 +75,18 @@ struct InputView: View {
             viewModel.recordingPlayer = recordingPlayer
             viewModel.setRecorderSettings(recorderSettings: recorderSettings)
         }
+        .onDisappear {
+            tapDelayTimer?.invalidate()
+            tapDelayTimer = nil
+        }
+        .alert("Voice recording", isPresented: Binding(
+            get: { viewModel.recordingError != nil },
+            set: { if !$0 { viewModel.recordingError = nil } }
+        )) {
+            Button("Close", role: .cancel) { viewModel.recordingError = nil }
+        } message: {
+            Text(viewModel.recordingError ?? "")
+        }
         .onDrag(towards: .bottom, ofAmount: 100...) {
             keyboardState.resignFirstResponder()
         }
@@ -124,10 +136,12 @@ struct InputView: View {
             switch state {
             case .hasRecording, .playingRecording, .pausedRecording:
                 recordWaveform
-            case .isRecordingHold:
-                swipeToCancel
-            case .isRecordingTap:
-                recordingInProgress
+            case .isRecordingHold, .isRecordingTap:
+                RecordWaveform(samples: Array((viewModel.attachments.recording?.waveformSamples ?? []).suffix(48)), addExtraDots: true)
+                    .foregroundStyle(theme.colors.mainText)
+                    .frame(height: 24)
+                    .padding(.horizontal, 8)
+                    .accessibilityLabel(Text("Microphone level"))
             default:
                 TextInputView(
                     text: $viewModel.text,
@@ -215,6 +229,7 @@ struct InputView: View {
                 .viewSize(48)
                 .circleBackground(theme.colors.sendButtonBackground)
         }
+        .accessibilityLabel(Text("Send message"))
     }
 
     var addButton: some View {

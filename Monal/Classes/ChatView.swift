@@ -657,6 +657,7 @@ struct ChatView: View {
             return retval
         })
         .setAvailableInputs([.text, .audio, .media, .file, .staticLocation])
+        .audioRecordingMode(.tapToToggle)
         .autoFocusTextInputOnChatOpen(chatViewDefaultsDB.showKeyboardOnChatOpen)
         .showUsername(contact.isMuc)
         .tapAvatarClosure { user, _ in
