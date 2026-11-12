@@ -11,11 +11,18 @@ on:
     branches:
       - develop
   workflow_dispatch:
+    inputs:
+      validation:
+        description: Validation to run on this branch
+        type: choice
+        default: tests
+        options: [tests, launch, integration]
 
 permissions: {}
 
 jobs:
   run_tests:
+    if: github.event_name != 'workflow_dispatch' || inputs.validation != 'launch'
     runs-on: macos-15
     name: Run automated tests
     steps:
@@ -71,4 +78,47 @@ jobs:
           name: test-results-${{ github.run_number }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/test-artifacts
           if-no-files-found: ignore
+          retention-days: 14
+
+  launch_and_package:
+    if: github.event_name == 'workflow_dispatch' && inputs.validation != 'tests'
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [iphonesimulator, iphoneos]
+    name: Alpha ${{ matrix.sdk }} validation
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 1000
+      - run: sudo xcode-select -s '/Applications/Xcode_26.2.app/Contents/Developer'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            rust/target
+            rust/LibMonalRustSwiftBridge
+            rust/monal-rust-swift-bridge/generated
+          key: rust-ios-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/**/*.rs', 'rust/build-rust.sh') }}
+      - name: Build Rust bridge
+        run: bash rust/build-rust.sh
+      - name: Install pods
+        working-directory: Monal
+        run: pod install --repo-update
+      - name: Build and validate Alpha
+        run: bash scripts/build-ios-testing.sh '${{ matrix.sdk }}'
+      - name: Install, launch and monitor simulator app
+        if: matrix.sdk == 'iphonesimulator'
+        run: bash scripts/smoke-launch-ios.sh
+      - name: Exercise unsigned package creation
+        if: matrix.sdk == 'iphoneos'
+        run: bash scripts/package-ios-testing.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: alpha-validation-${{ matrix.sdk }}
+          path: |
+            build/*-build.log
+            build/ios-testing/launch
           retention-days: 14

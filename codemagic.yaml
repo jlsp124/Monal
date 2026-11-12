@@ -1,72 +1,37 @@
-# Local testing workflow for this fork; keep it out of upstream feature PRs.
-# Produces an UNSIGNED IPA that must be signed before installation on an iPhone.
+# Unsigned testing package. A compatible signer must sign the app, frameworks and
+# extensions with matching App Group/keychain capabilities before installation.
 workflows:
   monal-ios-unsigned:
     name: Monal Alpha - unsigned iPhone IPA
     instance_type: mac_mini_m2
     max_build_duration: 120
     environment:
-      # Match the Xcode version used by Monal's GitHub Actions test build.
       xcode: 26.2
       cocoapods: default
     scripts:
-      - name: Fetch Monal submodules and LFS assets
+      - name: Fetch committed submodules
         script: |
-          set -eu
+          set -euo pipefail
           git submodule update --init --recursive
-          if command -v git-lfs >/dev/null 2>&1; then
-            git lfs pull
-          fi
-
-      - name: Build Monal's Rust-Swift bridge
+          if command -v git-lfs >/dev/null 2>&1; then git lfs pull; fi
+      - name: Generate Rust bridge
         script: |
-          set -eu
+          set -euo pipefail
           if ! command -v rustup >/dev/null 2>&1; then
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
           fi
           export PATH="$HOME/.cargo/bin:$PATH"
           bash rust/build-rust.sh
-
       - name: Install CocoaPods dependencies
         script: |
-          set -eu
+          set -euo pipefail
           cd Monal
           pod install --repo-update
-
-      - name: Build Monal Alpha for iPhone without signing
-        script: |
-          set -eu
-          xcodebuild \
-            -workspace "$CM_BUILD_DIR/Monal/Monal.xcworkspace" \
-            -scheme "Monal Alpha" \
-            -configuration Alpha \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$CM_BUILD_DIR/build/derived-data" \
-            CODE_SIGNING_ALLOWED=NO \
-            ENABLE_DEBUG_DYLIB=NO \
-            build
-
-      - name: Package unsigned IPA for later signing
-        script: |
-          set -eu
-          products="$CM_BUILD_DIR/build/derived-data/Build/Products/Alpha-iphoneos"
-          app="$(find "$products" -maxdepth 1 -type d -name '*.app' -print -quit)"
-          if [ -z "$app" ]; then
-            echo "No iPhone .app found in $products" >&2
-            exit 1
-          fi
-          # Sideloading registration accepts spaces, not periods, in app display names.
-          # Edit only the unsigned built product; leave bundle identifiers and sources intact.
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleName Monal Alpha' "$app/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Monal Alpha' "$app/Info.plist"
-          output="$CM_BUILD_DIR/build/ios/ipa"
-          mkdir -p "$output/Payload"
-          /usr/bin/ditto "$app" "$output/Payload/$(basename "$app")"
-          cd "$output"
-          zip -qry -X Monal-alpha-unsigned.ipa Payload
-          echo "Unsigned IPA: $output/Monal-alpha-unsigned.ipa"
-
+      - name: Build and validate device application
+        script: bash scripts/build-ios-testing.sh iphoneos
+      - name: Package application without editing binaries or metadata
+        script: bash scripts/package-ios-testing.sh
     artifacts:
-      - build/ios/ipa/*.ipa
-      - build/derived-data/Build/Products/Alpha-iphoneos/*.app
+      - build/ios-testing/ipa/*.ipa
+      - build/ios-testing/DerivedData/Build/Products/Alpha-iphoneos/*.app
+      - build/*-build.log
