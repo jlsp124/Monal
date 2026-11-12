@@ -40,7 +40,7 @@ jobs:
         run: sudo xcode-select -s '/Applications/Xcode_26.2.app/Contents/Developer'
       - name: Install coreutils
         run: brew install coreutils
-      - name: Build rust
+      - name: Restore Rust build cache
         uses: actions/cache@v4
         with:
           path: |

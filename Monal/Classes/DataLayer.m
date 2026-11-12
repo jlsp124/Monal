@@ -2068,7 +2068,7 @@ static NSDateFormatter* dbFormatter;
 -(NSNumber*) replyTargetForMessage:(MLMessage*) message
 {
     if(message.replyId.length == 0) return nil;
-    return [self.db idReadTransaction:^{
+    return [self.db idReadTransaction:^id{
         NSString* column = message.isMuc ? @"stanzaid" : @"messageid";
         NSString* direction = @"";
         if(!message.isMuc && message.replyTo.length > 0)

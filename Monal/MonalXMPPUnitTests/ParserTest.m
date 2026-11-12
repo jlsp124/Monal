@@ -11,6 +11,7 @@
 #import <monalxmpp/monalxmpp-Swift.h>
 #import <monalxmpp/MLConstants.h>
 #import <monalxmpp/HelperTools.h>
+#import <monalxmpp/XMPPMessage.h>
 #import "MLBasePaser.h"
 
 static NSMutableArray<MLXMLNode*>* _parsedStanzas;
@@ -70,6 +71,25 @@ static NSString* _rawXML = @"<?xml version='1.0'?>\n\
 @end
 
 @implementation ParserTest
+
+-(void) testReplyWireMetadataAndInvalidFallbackRanges
+{
+    XMPPMessage* message = [XMPPMessage new];
+    [message setBody:@"> quote\nAnswer"];
+    [message setReplyTo:@"alice@example.org/phone" withId:@"original-id" fallbackLength:8];
+    XCTAssertEqualObjects([message findFirst:@"{urn:xmpp:reply:0}reply@id"], @"original-id");
+    XCTAssertEqualObjects([message findFirst:@"{urn:xmpp:reply:0}reply@to"], @"alice@example.org/phone");
+    XCTAssertEqual([XMPPMessage replyFallbackLengthForBody:@"> quote\nAnswer" inMessage:message], 8);
+    MLXMLNode* range = [message findFirst:@"{urn:xmpp:fallback:0}fallback<for=urn:xmpp:reply:0>/body"];
+    for(NSString* invalidEnd in @[@"-1", @"abc", @"99999", @"18446744073709551616000"])
+    {
+        range.attributes[@"end"] = invalidEnd;
+        XCTAssertEqual([XMPPMessage replyFallbackLengthForBody:@"> quote\nAnswer" inMessage:message], 0);
+    }
+    range.attributes[@"end"] = @"8";
+    range.attributes[@"start"] = @"2";
+    XCTAssertEqual([XMPPMessage replyFallbackLengthForBody:@"> quote\nAnswer" inMessage:message], 0);
+}
 
 //parse complete xml document once and collect parsed stanzas in _parsedStanzas to be processed by our individual tests later on
 +(void) setUp

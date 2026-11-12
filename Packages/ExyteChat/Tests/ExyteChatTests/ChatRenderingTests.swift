@@ -44,7 +44,7 @@ final class ChatRenderingTests: XCTestCase {
         throw NSError(domain: "ChatRenderingTests", code: 1)
     }
 
-    func testCombinedChatRendersAndAppliesRapidUpdates() async throws {
+    func testCombinedChatLaysOutAndAppliesRapidUpdates() async throws {
         let me = User(id: "me", name: "You", isCurrentUser: true)
         let friend = User(id: "friend", name: "Alex", isCurrentUser: false)
         let fixture = ConversationFixture()
@@ -74,9 +74,31 @@ final class ChatRenderingTests: XCTestCase {
             let table = try await waitForRows(16, in: host)
             XCTAssertFalse(table.visibleCells.isEmpty)
             try await Task.sleep(nanoseconds: 200_000_000)
-            let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
+            // An unhosted package test cannot snapshot the simulator render server.
+            // Render the actual SwiftUI message components directly; table layout and
+            // updates are checked separately above/below. This is not an app screenshot.
+            let params = MessageCustomizationParameters(linkPreviewLimit: 0, font: UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 15), compatibleWith: UITraitCollection(preferredContentSizeCategory: dark ? .extraExtraExtraLarge : .large)))
+            let model = ChatViewModel()
+            let content = VStack(spacing: 12) {
+                ForEach(Array(fixture.messages.suffix(4))) { message in
+                    MessageView(viewModel: model, message: message, positionInUserGroup: .single, positionInMessagesSection: .single, chatType: .conversation, params: params, isDisplayingMessageMenu: false)
+                }
+            }
+            .padding(.vertical, 12)
+            .frame(width: 393)
+            .background(Color(uiColor: .systemBackground))
+            .environment(\.chatSize, CGSize(width: 393, height: 1400))
+            .environment(\.colorScheme, dark ? .dark : .light)
+            .environment(\.dynamicTypeSize, dark ? .xxxLarge : .large)
+            let renderer = ImageRenderer(content: content)
+            renderer.scale = 2
+            let image = try XCTUnwrap(renderer.uiImage)
+            let pixels = try XCTUnwrap(image.cgImage?.dataProvider?.data) as Data
+            let step = max(4, pixels.count / 15000 / 4 * 4)
+            let colors = Set(stride(from: 0, to: pixels.count - 4, by: step).map { pixels.subdata(in: $0..<($0 + 4)) })
+            XCTAssertGreaterThan(colors.count, 16, "A blank image cannot establish visual coverage")
             let attachment = XCTAttachment(image: image)
-            attachment.name = dark ? "Chat dark large text" : "Chat light"
+            attachment.name = dark ? "Message components dark large text" : "Message components light"
             attachment.lifetime = .keepAlways
             add(attachment)
 
