@@ -16,13 +16,13 @@ on:
         description: Validation to run on this branch
         type: choice
         default: tests
-        options: [tests, launch, integration]
+        options: [tests, launch, chat, integration]
 
 permissions: {}
 
 jobs:
   run_tests:
-    if: github.event_name != 'workflow_dispatch' || inputs.validation != 'launch'
+    if: github.event_name != 'workflow_dispatch' || inputs.validation == 'tests' || inputs.validation == 'integration'
     runs-on: macos-15
     name: Run automated tests
     steps:
@@ -81,7 +81,7 @@ jobs:
           retention-days: 14
 
   launch_and_package:
-    if: github.event_name == 'workflow_dispatch' && inputs.validation != 'tests'
+    if: github.event_name == 'workflow_dispatch' && (inputs.validation == 'launch' || inputs.validation == 'integration')
     runs-on: macos-15
     strategy:
       fail-fast: false
@@ -121,4 +121,21 @@ jobs:
           path: |
             build/*-build.log
             build/ios-testing/launch
+          retention-days: 14
+
+  chat_component_tests:
+    if: github.event_name == 'workflow_dispatch' && (inputs.validation == 'chat' || inputs.validation == 'integration')
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo xcode-select -s '/Applications/Xcode_26.2.app/Contents/Developer'
+      - run: mkdir -p build && bash scripts/test-chat-package.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: chat-component-tests
+          path: |
+            build/chat-tests.log
+            build/chat-schemes.json
+            build/chat-results.xcresult
           retention-days: 14
