@@ -949,6 +949,9 @@ struct ChatView: View {
             refreshConnectionState()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in refreshConnectionState() }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification, object: HelperTools.defaultsDB()).receive(on: RunLoop.main)) { _ in
+            chatViewDefaultsDB.objectWillChange.send()
+        }
         .toolbarRole(.editor)       //make sure to never show the title of the previous view in the back bar button
         .canContainExternalLinks()
         .addLoadingOverlay(overlay)
