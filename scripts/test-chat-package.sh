@@ -21,3 +21,4 @@ xcodebuild -scheme "$scheme" -destination 'platform=iOS Simulator,name=iPhone 16
     tail -130 "$root/build/chat-tests.log"; exit 1;
 }
 tail -45 "$root/build/chat-tests.log"
+xcrun xcresulttool export attachments --path "$root/build/chat-results.xcresult" --output-path "$root/build/chat-screenshots"

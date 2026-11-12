@@ -138,4 +138,5 @@ jobs:
             build/chat-tests.log
             build/chat-schemes.json
             build/chat-results.xcresult
+            build/chat-screenshots
           retention-days: 14
