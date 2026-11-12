@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
             }
 
             // reset NSUserDefaults
-            [[NSUserDefaults alloc] removePersistentDomainForName:kAppGroup];
+            [[NSUserDefaults alloc] removePersistentDomainForName:[HelperTools appGroupIdentifier]];
         }
         // invalidate account states
         if([NSProcessInfo.processInfo.arguments containsObject:@"--disableAnimations"])

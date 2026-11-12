@@ -542,6 +542,23 @@ static void notification_center_logging(CFNotificationCenterRef center, void* ob
 }
 @end
 
+NSString* MLResolveAppGroup(NSString* original, id metadata, NSURL* (^lookup)(NSString*))
+{
+    if(lookup(original) != nil)
+        return original;
+    if(![metadata isKindOfClass:[NSArray class]])
+        return nil;
+    NSString* prefix = [original stringByAppendingString:@"."];
+    for(id candidate in metadata)
+    {
+        if(![candidate isKindOfClass:[NSString class]] || ![candidate hasPrefix:prefix] || [candidate length] <= prefix.length)
+            continue;
+        if(lookup(candidate) != nil)
+            return candidate;
+    }
+    return nil;
+}
+
 @implementation HelperTools
 
 +(void) load
@@ -1080,12 +1097,27 @@ static void notification_center_logging(CFNotificationCenterRef center, void* ob
     return result;
 }
 
++(NSString*) appGroupIdentifier
+{
+    static NSString* identifier;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        // AltServer provisions team-specific group IDs and records them here in
+        // each signed bundle. The OS remains the authority for container access.
+        identifier = MLResolveAppGroup(kAppGroup, [[NSBundle mainBundle] objectForInfoDictionaryKey:@"ALTAppGroups"], ^NSURL*(NSString* candidate) {
+            return [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:candidate];
+        });
+    });
+    MLAssert(identifier != nil, @"App Group unavailable: sign the app and its extensions with matching App Group entitlements (including any AltServer remapping).");
+    return identifier;
+}
+
 +(NSURL*) getContainerURLForPathComponents:(NSArray*) components
 {
     static NSURL* containerUrl;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        containerUrl = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:kAppGroup];
+        containerUrl = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:[self appGroupIdentifier]];
     });
     MLAssert(containerUrl != nil, @"Container URL should never be nil!");
     NSURL* retval = containerUrl;
@@ -2268,7 +2300,7 @@ static void notification_center_logging(CFNotificationCenterRef center, void* ob
     static NSUserDefaults* db;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        db = [[MonalUserDefaults alloc] initWithSuiteName:kAppGroup];
+        db = [[MonalUserDefaults alloc] initWithSuiteName:[self appGroupIdentifier]];
     });
     return db;
 }
@@ -3544,7 +3576,7 @@ a=%@\r\n", mid, candidate];
             @"User-Agent": [HelperTools appBuildVersionInfoFor:MLVersionTypeUserAgent],
         };
         sessionConfig.sessionSendsLaunchEvents = YES;
-        sessionConfig.sharedContainerIdentifier = kAppGroup;
+        sessionConfig.sharedContainerIdentifier = [self appGroupIdentifier];
         sessionConfig.discretionary = NO;       //will be ignored by iOS for all transfers started in the background (appex or mainapp)
         //we don't need to make MLFileTransfer a singleton here, because this delegate will only be instanciated once per process
         session = [NSURLSession sessionWithConfiguration:sessionConfig delegate:[MLFiletransfer new] delegateQueue:nil];

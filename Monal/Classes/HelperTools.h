@@ -56,6 +56,9 @@ void swizzle(Class c, SEL orig, SEL new);
 NSArray* _Nullable arrayComprehension(id<NSFastEnumeration> _Nullable arr, id _Nullable (^cb)(id));
 NSDictionary* _Nullable dictionaryComprehension(NSDictionary* _Nullable dict, id _Nullable (^cb)(id, id));
 
+// Resolve only this application's group; the lookup must enforce OS access.
+FOUNDATION_EXPORT NSString* _Nullable MLResolveAppGroup(NSString* original, id _Nullable metadata, NSURL* _Nullable (^lookup)(NSString*));
+
 //weak container holding an object as weak pointer (needed to not create retain circles in NSCache
 @interface WeakContainer : NSObject
 @property (atomic, weak) id obj;
@@ -157,6 +160,7 @@ NSDictionary* _Nullable dictionaryComprehension(NSDictionary* _Nullable dict, id
 
 +(void) dispatchAsync:(BOOL) async reentrantOnQueue:(dispatch_queue_t _Nullable) queue withBlock:(monal_void_block_t) block;
 +(NSUserDefaults*) defaultsDB;
++(NSString*) appGroupIdentifier;
 +(NSUserDefaults*) standardDefaultsDB;
 +(BOOL) isAppExtension;
 +(NSString*) generateStringOfFeatureSet:(NSSet*) features;
