@@ -1099,6 +1099,8 @@ class ChatViewMessage: ExyteChat.Message {
     let innerMessage: ObservableKVOWrapper<MLMessage>
     let fileInfo: ObservableKVOWrapper<MLFiletransferInfo>?
     private var subscriptions: Set<AnyCancellable> = Set()
+    private var replySource: ObservableKVOWrapper<MLMessage>?
+    private var replySourceSubscription: AnyCancellable?
     override var text: String {
         if self.staticLocation != nil {
             return ""
@@ -1119,6 +1121,13 @@ class ChatViewMessage: ExyteChat.Message {
                   targetID != innerMessage.obj.messageDBId else { return nil }
             let target = MLMessage.createMessage(fromHistoryID: targetID)
             guard !target.deletedLocally else { return nil }
+            if replySource?.obj.messageDBId != targetID {
+                let source = ObservableKVOWrapper(target)
+                replySource = source
+                replySourceSubscription = source.objectWillChange
+                    .receive(on: RunLoop.main)
+                    .sink { [weak self] _ in self?.objectWillChange.send() }
+            }
             let summary: String
             if target.retracted {
                 summary = NSLocalizedString("This message got retracted", comment: "")

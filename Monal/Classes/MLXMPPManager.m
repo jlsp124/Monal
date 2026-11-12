@@ -735,7 +735,10 @@ static const int pingFreqencyMinutes = 5;       //about the same Conversations u
         // Keep upload URLs and geo: bodies intact for non-reply clients and content detection.
         if(replyId.length > 0 && [messageType isEqualToString:kMessageTypeText])
         {
-            NSString* summary = [replyToMessage.messageType isEqualToString:kMessageTypeText] ? replyToMessage.messageText : NSLocalizedString(@"Attachment", @"");
+            NSString* summary = replyToMessage.messageText;
+            if(replyToMessage.retracted) summary = NSLocalizedString(@"This message got retracted", @"");
+            else if([replyToMessage.messageType isEqualToString:kMessageTypeFiletransfer]) summary = NSLocalizedString(@"Attachment", @"");
+            else if([replyToMessage.messageType isEqualToString:kMessageTypeGeo]) summary = NSLocalizedString(@"Location", @"");
             if(summary.length > 500) summary = [summary substringToIndex:[summary rangeOfComposedCharacterSequencesForRange:NSMakeRange(0, 500)].length];
             NSString* quote = [NSString stringWithFormat:@"> %@\n", [summary stringByReplacingOccurrencesOfString:@"\n" withString:@"\n> "]];
             fallbackLength = [quote lengthOfBytesUsingEncoding:NSUTF32LittleEndianStringEncoding] / 4;
