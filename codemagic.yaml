@@ -44,6 +44,7 @@ workflows:
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$CM_BUILD_DIR/build/derived-data" \
             CODE_SIGNING_ALLOWED=NO \
+            ENABLE_DEBUG_DYLIB=NO \
             build
 
       - name: Package unsigned IPA for later signing
@@ -55,6 +56,10 @@ workflows:
             echo "No iPhone .app found in $products" >&2
             exit 1
           fi
+          # Sideloading registration accepts spaces, not periods, in app display names.
+          # Edit only the unsigned built product; leave bundle identifiers and sources intact.
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleName Monal Alpha' "$app/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Monal Alpha' "$app/Info.plist"
           output="$CM_BUILD_DIR/build/ios/ipa"
           mkdir -p "$output/Payload"
           /usr/bin/ditto "$app" "$output/Payload/$(basename "$app")"
